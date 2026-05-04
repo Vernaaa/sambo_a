@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>申堡營運中樞系統 MVP - 全功能版</title>
+    <title>申堡營運中樞系統 MVP - 全功能旗艦版</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -26,6 +26,16 @@
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 8px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+        
+        /* 列印專屬樣式黑科技 */
+        @media print {
+            body { background-color: white !important; }
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            .print-container { width: 100%; max-width: 100%; padding: 0 !important; margin: 0 !important; box-shadow: none !important; border: none !important; }
+            @page { margin: 15mm; size: A4 portrait; }
+        }
+        .print-only { display: none; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
@@ -39,9 +49,10 @@
         const SUPABASE_KEY = 'sb_publishable_f7RuOJ8xRT8qXNIjwP5wlw_pRTFKN3b';
         const supabase = Object.assign(window['supabase']).createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // --- 輔助函式 ---
+        // --- 輔助函式與防呆 ---
         const generateId = () => Math.random().toString(36).substr(2, 9);
         const numberToChinese = (num) => {
+            if (isNaN(num) || num == null || num === 0) return '零元整';
             const fraction = ['角', '分'];
             const digit = ['零', '壹', '貳', '參', '肆', '伍', '陸', '柒', '捌', '玖'];
             const unit = [['元', '萬', '億'], ['', '拾', '佰', '仟']];
@@ -56,6 +67,13 @@
             return s.replace(/(零.)*零元/, '元').replace(/(零.)+/g, '零').replace(/^整$/, '零元整');
         };
         const getToday = () => new Date().toISOString().split('T')[0];
+        
+        // 轉換西元年為民國年
+        const toTaiwanYear = (dateStr) => {
+            if (!dateStr) return '';
+            const d = new Date(dateStr);
+            return `${d.getFullYear() - 1911} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日`;
+        };
 
         const companyInfo = {
             name: "申堡辦公家具行",
@@ -71,8 +89,9 @@
             const [activeTab, setActiveTab] = useState('dashboard');
             const [toast, setToast] = useState(null);
             const [syncStatus, setSyncStatus] = useState('idle');
+            const [printDoc, setPrintDoc] = useState(null); // 用於控制報表預覽 { type: 'quote' | 'order', data: {} }
 
-            // --- 核心資料庫 (本機快取優先) ---
+            // --- 核心資料庫 (本機快取優先，加入容錯預設值) ---
             const [productMaster, setProductMaster] = useState(() => {
                 const saved = localStorage.getItem('shenbao_products');
                 return saved ? JSON.parse(saved) : [
@@ -81,20 +100,18 @@
                 ];
             });
             const [invoices, setInvoices] = useState(() => JSON.parse(localStorage.getItem('shenbao_invoices') || '[]'));
-            const [quotes, setQuotes] = useState(() => JSON.parse(localStorage.getItem('shenbao_quotes') || JSON.stringify([
-                { id: 'Q-20231222-001', client: '澎湖縣政府環保局', date: '2023-12-22', amount: 1300, status: '已確認', items: [{name: '活動高櫃', specs: 'W40*D56*H65cm', qty: 1, unitPrice: 1300, supplier: '大日'}] }
-            ])));
+            const [quotes, setQuotes] = useState(() => JSON.parse(localStorage.getItem('shenbao_quotes') || '[]'));
             const [orders, setOrders] = useState(() => JSON.parse(localStorage.getItem('shenbao_orders') || '[]'));
             const [logistics, setLogistics] = useState(() => JSON.parse(localStorage.getItem('shenbao_logistics') || '[]'));
 
             // --- 視圖控制狀態 ---
-            const [quoteView, setQuoteView] = useState('list'); // 'list', 'create'
-            const [invoiceView, setInvoiceView] = useState('list'); // 'list', 'entry'
+            const [quoteView, setQuoteView] = useState('list'); 
+            const [invoiceView, setInvoiceView] = useState('list'); 
             const [newQuoteData, setNewQuoteData] = useState({ client: '', items: [] });
             const [selectedProduct, setSelectedProduct] = useState('');
             const [qty, setQty] = useState(1);
 
-            // --- 資料同步機制 (Effect Hooks) ---
+            // --- 資料同步機制 ---
             useEffect(() => { localStorage.setItem('shenbao_products', JSON.stringify(productMaster)); }, [productMaster]);
             useEffect(() => { localStorage.setItem('shenbao_invoices', JSON.stringify(invoices)); }, [invoices]);
             useEffect(() => { localStorage.setItem('shenbao_quotes', JSON.stringify(quotes)); }, [quotes]);
@@ -103,24 +120,184 @@
 
             const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
+            // 觸發列印黑科技
+            const handlePrint = (type, data) => {
+                setPrintDoc({ type, data });
+                setTimeout(() => window.print(), 300); // 給予 React 渲染版面的時間
+            };
+
+            // ==========================================
+            // 報表引擎 (Print Engine) - 精準對齊您的版型
+            // ==========================================
+            if (printDoc) {
+                if (printDoc.type === 'quote') {
+                    // --- 估價單報表 ---
+                    const q = printDoc.data;
+                    const qTotal = (q.amount || 0);
+                    return (
+                        <div className="bg-white text-black min-h-screen p-10 font-serif print-container animate-slide-in max-w-4xl mx-auto">
+                            <div className="no-print mb-8 p-4 bg-indigo-50 border border-indigo-200 rounded-xl flex justify-between items-center shadow-lg">
+                                <span className="font-bold text-indigo-800"><i className="ph-fill ph-printer"></i> 報表預覽模式：請使用瀏覽器列印功能 (Ctrl+P) 匯出 PDF</span>
+                                <div className="flex gap-4">
+                                    <button onClick={() => window.print()} className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold shadow hover:bg-indigo-700">立即列印 / 存為 PDF</button>
+                                    <button onClick={() => setPrintDoc(null)} className="bg-slate-200 text-slate-700 px-6 py-2 rounded-lg font-bold shadow hover:bg-slate-300">返回系統</button>
+                                </div>
+                            </div>
+                            
+                            {/* 正式報表內容 */}
+                            <h1 className="text-center text-4xl font-bold tracking-[1em] mb-10 ml-4">估價單</h1>
+                            <div className="flex justify-between items-end mb-4 text-lg">
+                                <div className="font-bold border-b border-black pb-1 min-w-[300px]">
+                                    {q.client} <span className="ml-10">台照</span>
+                                </div>
+                                <div className="text-right">
+                                    電話: {companyInfo.phone.replace('(06)', '')}
+                                </div>
+                            </div>
+                            <div className="mb-6 text-lg tracking-wider">
+                                中華民國 <span className="mx-2">{toTaiwanYear(q.date)}</span>
+                            </div>
+                            
+                            <table className="w-full border-collapse border border-black text-center text-lg mb-4">
+                                <thead>
+                                    <tr className="bg-slate-100">
+                                        <th className="border border-black p-3 w-1/3">品          名</th>
+                                        <th className="border border-black p-3">規  格</th>
+                                        <th className="border border-black p-3">數 量</th>
+                                        <th className="border border-black p-3">單 價</th>
+                                        <th className="border border-black p-3">金 額</th>
+                                        <th className="border border-black p-3">備註</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(q.items || []).map((item, idx) => (
+                                        <tr key={idx}>
+                                            <td className="border border-black p-3 text-left">{item.name}</td>
+                                            <td className="border border-black p-3">{item.specs}</td>
+                                            <td className="border border-black p-3">{item.qty || 0}</td>
+                                            <td className="border border-black p-3">{(item.unitPrice || 0).toLocaleString()}</td>
+                                            <td className="border border-black p-3">{( (item.qty || 0) * (item.unitPrice || 0) ).toLocaleString()}</td>
+                                            <td className="border border-black p-3"></td>
+                                        </tr>
+                                    ))}
+                                    {/* 以下空白列 */}
+                                    <tr>
+                                        <td className="border border-black p-3 text-left">以下空白</td>
+                                        <td className="border border-black p-3"></td>
+                                        <td className="border border-black p-3"></td>
+                                        <td className="border border-black p-3"></td>
+                                        <td className="border border-black p-3"></td>
+                                        <td className="border border-black p-3"></td>
+                                    </tr>
+                                    {/* 空白填充，維持版面 */}
+                                    {[...Array(3)].map((_, i) => (
+                                        <tr key={`empty-${i}`}>
+                                            <td className="border border-black p-5"></td><td className="border border-black p-5"></td><td className="border border-black p-5"></td><td className="border border-black p-5"></td><td className="border border-black p-5"></td><td className="border border-black p-5"></td>
+                                        </tr>
+                                    ))}
+                                    <tr>
+                                        <td colSpan="4" className="border border-black p-3 text-left font-bold tracking-widest">
+                                            總額新台幣 {numberToChinese(qTotal).split('').join(' ')}
+                                        </td>
+                                        <td colSpan="2" className="border border-black p-3 text-left font-bold font-mono">
+                                            NT$ {qTotal.toLocaleString()}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            {/* 印章預留區 */}
+                            <div className="mt-20 flex justify-end pr-10 opacity-30 border-2 border-dashed border-red-200 w-32 h-32 ml-auto items-center text-center text-red-400 text-sm">
+                                [公司大章<br/>預留位置]
+                            </div>
+                        </div>
+                    );
+                } else if (printDoc.type === 'order') {
+                    // --- 訂貨明細單報表 ---
+                    const o = printDoc.data;
+                    return (
+                        <div className="bg-white text-black min-h-screen p-10 font-sans print-container animate-slide-in max-w-4xl mx-auto">
+                            <div className="no-print mb-8 p-4 bg-amber-50 border border-amber-200 rounded-xl flex justify-between items-center shadow-lg">
+                                <span className="font-bold text-amber-800"><i className="ph-fill ph-printer"></i> 報表預覽模式：請使用瀏覽器列印功能 (Ctrl+P) 匯出 PDF</span>
+                                <div className="flex gap-4">
+                                    <button onClick={() => window.print()} className="bg-amber-600 text-white px-6 py-2 rounded-lg font-bold shadow hover:bg-amber-700">立即列印 / 存為 PDF</button>
+                                    <button onClick={() => setPrintDoc(null)} className="bg-slate-200 text-slate-700 px-6 py-2 rounded-lg font-bold shadow hover:bg-slate-300">返回系統</button>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-between items-start mb-6 border-b-2 border-black pb-6">
+                                <div className="text-lg space-y-1">
+                                    <h2 className="text-2xl font-black mb-2">{companyInfo.name}</h2>
+                                    <p>統一編號: {companyInfo.taxId}</p>
+                                    <p>店址: {companyInfo.address}</p>
+                                    <p>電話: {companyInfo.phone}</p>
+                                    <p>傳真: {companyInfo.fax}</p>
+                                </div>
+                                <div className="text-right">
+                                    <h1 className="text-4xl font-black tracking-widest mb-6">訂貨明細單</h1>
+                                    <p className="text-lg">訂單編號: <span className="font-mono">{o.id}</span></p>
+                                    <p className="text-lg">訂貨日期: <span className="font-mono">{toTaiwanYear(o.date)}</span></p>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-between text-lg mb-6 bg-slate-100 p-4 rounded border border-black">
+                                <div className="font-bold">訂貨廠商: <span className="ml-2 text-xl">{o.supplier}</span></div>
+                                <div className="font-bold">聯絡人: <span className="ml-2 text-slate-400 font-normal">________________</span></div>
+                            </div>
+
+                            <table className="w-full border-collapse border border-black text-center text-lg">
+                                <thead>
+                                    <tr className="bg-slate-200">
+                                        <th className="border border-black p-3 w-16">編號</th>
+                                        <th className="border border-black p-3 w-1/3">品名</th>
+                                        <th className="border border-black p-3">規格</th>
+                                        <th className="border border-black p-3 w-20">數量</th>
+                                        <th className="border border-black p-3">備註</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(o.items || []).map((item, idx) => (
+                                        <tr key={idx}>
+                                            <td className="border border-black p-4 font-mono">{idx + 1}</td>
+                                            <td className="border border-black p-4 text-left font-bold">{item.name}</td>
+                                            <td className="border border-black p-4">{item.specs}</td>
+                                            <td className="border border-black p-4 font-bold">{item.qty || 0}</td>
+                                            <td className="border border-black p-4 text-left text-sm text-slate-500">來源: {o.client}</td>
+                                        </tr>
+                                    ))}
+                                    {/* 空白填充 */}
+                                    {[...Array(5)].map((_, i) => (
+                                        <tr key={`empty-${i}`}>
+                                            <td className="border border-black p-6"></td><td className="border border-black p-6"></td><td className="border border-black p-6"></td><td className="border border-black p-6"></td><td className="border border-black p-6"></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            <div className="mt-10 text-center text-sm text-slate-500">
+                                本訂貨單由申堡營運中樞系統自動生成
+                            </div>
+                        </div>
+                    );
+                }
+            }
+
             // ==========================================
             // 1. 營運全景儀表板 (Dashboard)
             // ==========================================
             const renderDashboard = () => (
-                <div className="p-8 animate-slide-in max-w-7xl mx-auto">
+                <div className="p-8 animate-slide-in max-w-7xl mx-auto no-print">
                     <h2 className="text-2xl font-bold tracking-wider text-slate-800 mb-6">營運全景儀表板</h2>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                         <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm border-l-4 border-l-blue-500">
                             <p className="text-slate-500 text-sm font-bold tracking-widest uppercase mb-1">本月累計報價金額</p>
-                            <h3 className="text-3xl font-black text-slate-800 font-mono">${quotes.reduce((s,q)=>s+q.amount,0).toLocaleString()}</h3>
+                            <h3 className="text-3xl font-black text-slate-800 font-mono">${(quotes.reduce((s,q)=>s+(q.amount||0),0)).toLocaleString()}</h3>
                         </div>
                         <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
                             <p className="text-slate-500 text-sm font-bold tracking-widest uppercase mb-1">待出貨任務</p>
-                            <h3 className="text-3xl font-black text-slate-800 font-mono">{logistics.filter(l=>l.status!=='已送達').length} <span className="text-sm font-bold text-slate-400">單</span></h3>
+                            <h3 className="text-3xl font-black text-slate-800 font-mono">{(logistics || []).filter(l=>l.status!=='已送達').length} <span className="text-sm font-bold text-slate-400">單</span></h3>
                         </div>
                         <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm border-l-4 border-l-amber-500">
                             <p className="text-slate-500 text-sm font-bold tracking-widest uppercase mb-1">雲端商品庫存</p>
-                            <h3 className="text-3xl font-black text-slate-800 font-mono">{productMaster.length} <span className="text-sm font-bold text-slate-400">項</span></h3>
+                            <h3 className="text-3xl font-black text-slate-800 font-mono">{(productMaster || []).length} <span className="text-sm font-bold text-slate-400">項</span></h3>
                         </div>
                     </div>
                 </div>
@@ -133,14 +310,14 @@
                 if (!newQuoteData.client) return showToast("請先填寫客戶名稱");
                 const p = productMaster.find(x => x.id === selectedProduct);
                 if (p) {
-                    setNewQuoteData({ ...newQuoteData, items: [...newQuoteData.items, { ...p, qty }] });
+                    setNewQuoteData({ ...newQuoteData, items: [...(newQuoteData.items || []), { ...p, qty: qty || 1 }] });
                     setSelectedProduct(''); setQty(1);
                 }
             };
-            const quoteTotal = newQuoteData.items.reduce((sum, item) => sum + (item.unitPrice * item.qty), 0);
+            const quoteTotal = (newQuoteData.items || []).reduce((sum, item) => sum + ((item.unitPrice || 0) * (item.qty || 0)), 0);
 
             const handleSaveQuote = () => {
-                if (newQuoteData.items.length === 0) return showToast("報價單不能為空");
+                if ((newQuoteData.items || []).length === 0) return showToast("報價單不能為空");
                 const newQuote = {
                     id: `Q-${getToday().replace(/-/g,'')}-${String(quotes.length+1).padStart(3,'0')}`,
                     client: newQuoteData.client,
@@ -163,7 +340,7 @@
             const renderQuotations = () => {
                 if (quoteView === 'create') {
                     return (
-                        <div className="p-8 animate-slide-in max-w-7xl mx-auto">
+                        <div className="p-8 animate-slide-in max-w-7xl mx-auto no-print">
                             <div className="flex justify-between items-center mb-6">
                                 <h2 className="text-2xl font-bold tracking-wider text-slate-800">新增報價單</h2>
                                 <button onClick={() => setQuoteView('list')} className="text-slate-500 hover:text-slate-800 font-bold"><i className="ph ph-arrow-left"></i> 返回列表</button>
@@ -181,12 +358,12 @@
                                         <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">選擇產品</label>
                                         <select value={selectedProduct} onChange={(e) => setSelectedProduct(e.target.value)} className="w-full px-4 py-3 border border-slate-300 rounded-xl shadow-sm focus:border-indigo-500 bg-white font-medium">
                                             <option value="">-- 請選擇產品 --</option>
-                                            {productMaster.map(p => <option key={p.id} value={p.id}>[{p.supplier}] {p.name}</option>)}
+                                            {(productMaster || []).map(p => <option key={p.id} value={p.id}>[{p.supplier || '廠'}] {p.name}</option>)}
                                         </select>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">數量</label>
-                                        <input type="number" min="1" value={qty} onChange={(e) => setQty(parseInt(e.target.value))} className="w-full px-4 py-3 border border-slate-300 rounded-xl shadow-sm text-center font-mono" />
+                                        <input type="number" min="1" value={qty} onChange={(e) => setQty(parseInt(e.target.value) || 1)} className="w-full px-4 py-3 border border-slate-300 rounded-xl shadow-sm text-center font-mono" />
                                     </div>
                                     <div>
                                         <button onClick={handleAddQuoteItem} className="w-full bg-indigo-600 text-white py-3 rounded-xl hover:bg-indigo-700 font-bold shadow-md">
@@ -196,19 +373,9 @@
                                 </div>
                             </div>
 
-                            {newQuoteData.items.length > 0 && (
+                            {(newQuoteData.items || []).length > 0 && (
                                 <div className="bg-white rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden">
-                                    {/* 實體門市品牌視覺 (Magic Link 預覽) */}
-                                    <div className="p-8 border-b border-slate-200 flex items-center gap-8 bg-gradient-to-r from-slate-50 to-white">
-                                        <div className="w-32 h-24 rounded-xl overflow-hidden shadow-md shrink-0 border-2 border-white"><img src={companyInfo.storeImageUrl} alt="申堡" className="w-full h-full object-cover" /></div>
-                                        <div>
-                                            <h3 className="text-2xl font-black text-slate-800 tracking-wider mb-1">{companyInfo.name}</h3>
-                                            <div className="text-xs text-slate-500 font-bold space-y-1">
-                                                <p><i className="ph-fill ph-buildings"></i> 統編：{companyInfo.taxId} | <i className="ph-fill ph-phone"></i> {companyInfo.phone}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <table className="w-full text-left text-sm">
+                                    <table className="w-full text-left text-sm mt-4 border-t">
                                         <thead className="bg-slate-50 border-b border-slate-200">
                                             <tr><th className="p-4 font-black text-slate-400">品名/規格</th><th className="p-4 font-black text-slate-400 text-center">數量</th><th className="p-4 font-black text-slate-400 text-right">小計</th></tr>
                                         </thead>
@@ -217,7 +384,7 @@
                                                 <tr key={idx} className="hover:bg-slate-50/50">
                                                     <td className="p-4"><div className="font-bold text-slate-800">{item.name}</div><div className="text-xs text-slate-500">{item.specs}</div></td>
                                                     <td className="p-4 text-center font-bold">{item.qty}</td>
-                                                    <td className="p-4 text-right font-black text-indigo-600 font-mono">${(item.unitPrice * item.qty).toLocaleString()}</td>
+                                                    <td className="p-4 text-right font-black text-indigo-600 font-mono">${((item.unitPrice || 0) * (item.qty || 0)).toLocaleString()}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -225,8 +392,8 @@
                                     <div className="bg-slate-50 p-6 border-t flex justify-between items-center">
                                         <div className="bg-white p-3 rounded-xl border-l-4 border-l-emerald-500"><div className="text-[10px] font-black text-slate-400">大寫總額</div><div className="font-bold text-sm tracking-wider">{numberToChinese(quoteTotal)}</div></div>
                                         <div className="text-right">
-                                            <div className="text-2xl font-black text-slate-800 mb-4">總計: ${quoteTotal.toLocaleString()}</div>
-                                            <button onClick={handleSaveQuote} className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-emerald-700 shadow-lg">儲存並產生連結</button>
+                                            <div className="text-2xl font-black text-slate-800 mb-4">總計: ${(quoteTotal || 0).toLocaleString()}</div>
+                                            <button onClick={handleSaveQuote} className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-emerald-700 shadow-lg">儲存報價單</button>
                                         </div>
                                     </div>
                                 </div>
@@ -235,7 +402,7 @@
                     );
                 }
                 return (
-                    <div className="p-8 animate-slide-in max-w-7xl mx-auto">
+                    <div className="p-8 animate-slide-in max-w-7xl mx-auto no-print">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-2xl font-bold tracking-wider text-slate-800">報價單總覽</h2>
                             <button onClick={() => setQuoteView('create')} className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl hover:bg-indigo-700 font-bold shadow-md"><i className="ph ph-plus-circle"></i> 建立新報價</button>
@@ -246,18 +413,19 @@
                                     <tr><th className="p-5 text-xs font-black text-slate-400">單號/日期</th><th className="p-5 text-xs font-black text-slate-400">客戶名稱</th><th className="p-5 text-xs font-black text-slate-400 text-right">金額</th><th className="p-5 text-xs font-black text-slate-400 text-center">狀態</th><th className="p-5 text-xs font-black text-slate-400 text-center">操作</th></tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {quotes.map(q => (
+                                    {(quotes || []).map(q => (
                                         <tr key={q.id} className="hover:bg-slate-50">
                                             <td className="p-5"><div className="font-bold text-slate-800">{q.id}</div><div className="text-xs text-slate-500">{q.date}</div></td>
                                             <td className="p-5 font-bold text-slate-700">{q.client}</td>
-                                            <td className="p-5 text-right font-black text-slate-700 font-mono">${q.amount.toLocaleString()}</td>
+                                            <td className="p-5 text-right font-black text-slate-700 font-mono">${(q.amount || 0).toLocaleString()}</td>
                                             <td className="p-5 text-center"><span className={`px-3 py-1 rounded-full text-xs font-bold ${q.status==='已確認'?'bg-emerald-100 text-emerald-700':'bg-amber-100 text-amber-700'}`}>{q.status}</span></td>
                                             <td className="p-5 text-center flex justify-center gap-2">
-                                                {q.status === '草稿' && <button onClick={()=>confirmQuote(q.id)} className="bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-600">標記客戶已確認</button>}
-                                                <button className="text-indigo-600 font-bold bg-indigo-50 px-3 py-1.5 rounded-lg text-xs hover:bg-indigo-100">檢視</button>
+                                                {q.status !== '已確認' && <button onClick={()=>confirmQuote(q.id)} className="bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-600 shadow">標記確認</button>}
+                                                <button onClick={() => handlePrint('quote', q)} className="text-indigo-600 font-bold bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg text-xs hover:bg-indigo-100 flex items-center gap-1 shadow-sm"><i className="ph ph-printer"></i> 匯出報表</button>
                                             </td>
                                         </tr>
                                     ))}
+                                    {quotes.length === 0 && <tr><td colSpan="5" className="p-10 text-center text-slate-400 font-bold">尚無報價單紀錄</td></tr>}
                                 </tbody>
                             </table>
                         </div>
@@ -269,27 +437,24 @@
             // 3. 訂貨與採購 (智慧拋轉)
             // ==========================================
             const generateOrdersFromQuotes = () => {
-                const confirmedQuotes = quotes.filter(q => q.status === '已確認');
+                const confirmedQuotes = (quotes || []).filter(q => q.status === '已確認');
                 if (confirmedQuotes.length === 0) return showToast("目前沒有可拋轉的報價單");
 
                 let newOrdersAdded = 0;
                 let newLogisticsAdded = 0;
-                const newOrdersList = [...orders];
-                const newLogisticsList = [...logistics];
+                const newOrdersList = [...(orders || [])];
+                const newLogisticsList = [...(logistics || [])];
 
                 confirmedQuotes.forEach(quote => {
-                    // 檢查是否已拋轉過
-                    if (orders.some(o => o.refQuote === quote.id)) return;
+                    if (newOrdersList.some(o => o.refQuote === quote.id)) return;
 
-                    // 依供應商分組
                     const supplierGroups = {};
-                    quote.items.forEach(item => {
-                        const sup = item.supplier || '未指定供應商';
+                    (quote.items || []).forEach(item => {
+                        const sup = item.supplier || '無特定原廠';
                         if (!supplierGroups[sup]) supplierGroups[sup] = [];
                         supplierGroups[sup].push(item);
                     });
 
-                    // 針對每個供應商產生訂貨單
                     Object.keys(supplierGroups).forEach(sup => {
                         const newPoId = `PO-${getToday().replace(/-/g,'')}-${generateId().substring(0,4).toUpperCase()}`;
                         newOrdersList.push({
@@ -299,11 +464,10 @@
                             refQuote: quote.id,
                             client: quote.client,
                             items: supplierGroups[sup],
-                            status: '草稿'
+                            status: '已建立'
                         });
                         newOrdersAdded++;
 
-                        // 同步產生出貨任務 (預備中)
                         newLogisticsList.push({
                             id: `DO-${newPoId.split('-')[1]}-${generateId().substring(0,3).toUpperCase()}`,
                             client: quote.client,
@@ -318,14 +482,14 @@
                 if (newOrdersAdded > 0) {
                     setOrders(newOrdersList);
                     setLogistics(newLogisticsList);
-                    showToast(`成功拋轉！共產生 ${newOrdersAdded} 張訂貨單與 ${newLogisticsAdded} 張出貨預備單。`);
+                    showToast(`成功拋轉！共產生 ${newOrdersAdded} 張訂貨單與 ${newLogisticsAdded} 張出貨任務。`);
                 } else {
                     showToast("所有已確認報價單皆已拋轉過。");
                 }
             };
 
             const renderOrders = () => (
-                <div className="p-8 animate-slide-in max-w-7xl mx-auto">
+                <div className="p-8 animate-slide-in max-w-7xl mx-auto no-print">
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-2xl font-bold tracking-wider text-slate-800">向供應商訂貨與採購</h2>
                     </div>
@@ -333,7 +497,7 @@
                     <div className="bg-indigo-50 border border-indigo-200 rounded-[2rem] p-8 mb-8 relative overflow-hidden shadow-sm">
                         <div className="absolute right-[-20px] top-[-20px] opacity-10"><i className="ph-fill ph-magic-wand text-9xl text-indigo-500"></i></div>
                         <h3 className="font-black text-xl text-indigo-900 mb-2 relative z-10">智慧拆單引擎</h3>
-                        <p className="text-sm text-indigo-700 mb-6 font-bold relative z-10">系統將自動撈取狀態為「已確認」的報價單，並依據產品的【供應商屬性】，將一筆對客戶的報價單，精準拆分為多張對原廠的訂貨單。</p>
+                        <p className="text-sm text-indigo-700 mb-6 font-bold relative z-10">系統將自動撈取狀態為「已確認」的報價單，依供應商屬性精準拆分為對原廠的訂貨單。</p>
                         <button onClick={generateOrdersFromQuotes} className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-black hover:bg-indigo-700 shadow-lg relative z-10 transition-transform active:scale-95">
                             <i className="ph-bold ph-magic-wand"></i> 一鍵拋轉產生訂貨單
                         </button>
@@ -345,14 +509,18 @@
                                 <tr><th className="p-5 text-xs font-black text-slate-400">訂貨單號</th><th className="p-5 text-xs font-black text-slate-400">供應商</th><th className="p-5 text-xs font-black text-slate-400">對應客戶(報價單)</th><th className="p-5 text-xs font-black text-slate-400 text-center">狀態</th><th className="p-5 text-xs font-black text-slate-400 text-center">操作</th></tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {orders.length === 0 && <tr><td colSpan="5" className="p-10 text-center text-slate-400 font-bold">目前無訂貨單資料</td></tr>}
-                                {orders.map(o => (
+                                {(orders || []).length === 0 && <tr><td colSpan="5" className="p-10 text-center text-slate-400 font-bold">目前無訂貨單資料</td></tr>}
+                                {(orders || []).map(o => (
                                     <tr key={o.id} className="hover:bg-slate-50">
                                         <td className="p-5"><div className="font-bold text-slate-800 font-mono">{o.id}</div><div className="text-xs text-slate-500">{o.date}</div></td>
                                         <td className="p-5 font-black text-indigo-700">{o.supplier}</td>
                                         <td className="p-5"><div className="font-bold text-slate-700">{o.client}</div><div className="text-xs text-slate-400 font-mono">來源: {o.refQuote}</div></td>
                                         <td className="p-5 text-center"><span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700">{o.status}</span></td>
-                                        <td className="p-5 text-center"><button className="text-indigo-600 font-bold bg-indigo-50 px-4 py-2 rounded-xl hover:bg-indigo-100 transition-colors">匯出 PDF 憑證</button></td>
+                                        <td className="p-5 text-center">
+                                            <button onClick={() => handlePrint('order', o)} className="text-amber-700 font-bold bg-amber-50 border border-amber-200 px-4 py-2 rounded-xl hover:bg-amber-100 transition-colors shadow-sm flex items-center gap-1 mx-auto">
+                                                <i className="ph ph-printer"></i> 匯出訂貨單
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -362,7 +530,7 @@
             );
 
             // ==========================================
-            // 4. 出貨與物流 (Logistics - Mobile First)
+            // 4. 司機端出貨看版 (保留原本設定)
             // ==========================================
             const updateLogisticsStatus = (id, currentStatus) => {
                 const nextStatus = currentStatus === '待進貨' ? '準備出車' : '已送達';
@@ -371,13 +539,13 @@
             };
 
             const renderLogistics = () => (
-                <div className="p-4 md:p-8 animate-slide-in max-w-7xl mx-auto h-full overflow-y-auto">
+                <div className="p-4 md:p-8 animate-slide-in max-w-7xl mx-auto h-full overflow-y-auto no-print">
                     <h2 className="text-2xl font-bold tracking-wider text-slate-800 mb-6">出貨任務看板 <span className="text-sm font-normal text-slate-500">(司機端行動視角)</span></h2>
                     
-                    {logistics.length === 0 && <div className="text-center p-10 text-slate-400 font-bold bg-white rounded-3xl border border-dashed">目前無出貨任務</div>}
+                    {(logistics || []).length === 0 && <div className="text-center p-10 text-slate-400 font-bold bg-white rounded-3xl border border-dashed">目前無出貨任務</div>}
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
-                        {logistics.map(task => (
+                        {(logistics || []).map(task => (
                             <div key={task.id} className="bg-white rounded-3xl shadow-md border border-slate-200 overflow-hidden relative flex flex-col">
                                 <div className={`h-2 w-full absolute top-0 left-0 ${task.status === '待進貨' ? 'bg-amber-400' : task.status === '準備出車' ? 'bg-blue-500' : 'bg-emerald-500'}`}></div>
                                 <div className="p-6 flex-1 flex flex-col">
@@ -387,22 +555,17 @@
                                             <h3 className="text-lg font-black text-slate-800 mt-2">{task.client}</h3>
                                         </div>
                                     </div>
-                                    
                                     <div className="bg-slate-50 rounded-2xl p-4 mb-4 border border-slate-100 flex-1">
                                         <div className="text-[10px] font-black text-slate-400 uppercase mb-2">應送達明細</div>
-                                        {task.items.map((item, i) => (
+                                        {(task.items || []).map((item, i) => (
                                             <div key={i} className="flex justify-between items-center text-sm mb-2 last:mb-0">
                                                 <div className="font-bold text-slate-700 truncate pr-2">{item.name}</div>
-                                                <div className="font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">x {item.qty}</div>
+                                                <div className="font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">x {item.qty || 0}</div>
                                             </div>
                                         ))}
                                     </div>
-
                                     {task.status !== '已送達' ? (
-                                        <button 
-                                            onClick={() => updateLogisticsStatus(task.id, task.status)} 
-                                            className={`w-full py-4 rounded-2xl font-black text-white shadow-lg transition-transform active:scale-95 flex justify-center items-center gap-2 ${task.status === '待進貨' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
-                                        >
+                                        <button onClick={() => updateLogisticsStatus(task.id, task.status)} className={`w-full py-4 rounded-2xl font-black text-white shadow-lg transition-transform active:scale-95 flex justify-center items-center gap-2 ${task.status === '待進貨' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
                                             {task.status === '待進貨' ? <><i className="ph-bold ph-package"></i> 確認理貨完成，準備出車</> : <><i className="ph-bold ph-signature"></i> 抵達現場，請客戶簽收</>}
                                         </button>
                                     ) : (
@@ -417,37 +580,25 @@
                 </div>
             );
 
-            // --- 其他模組佔位 ---
-            const renderProducts = () => (
-                <div className="p-8 max-w-7xl mx-auto"><h2 className="text-2xl font-bold mb-6">產品資料庫</h2><p>雲端主檔資料，請於發票模組或系統後台維護。</p></div>
-            );
-            const renderInvoices = () => (
-                <div className="p-8 max-w-7xl mx-auto bg-indigo-900 rounded-[3rem] text-white mt-8 ml-8 mr-8">
-                    <h2 className="text-3xl font-black italic">財務發票中樞</h2>
-                    <p className="mt-4 text-indigo-200 font-bold">此處為您先前開發的 NextGen 發票系統完整邏輯區塊。</p>
-                </div>
-            );
-
-            // --- 導航列定義 ---
+            // ==========================================
+            // Main Layout 
+            // ==========================================
             const menuItems = [
                 { id: 'dashboard', name: '營運儀表板', icon: 'ph-chart-pie' },
-                { id: 'quotations', name: '報價單 (Magic Link)', icon: 'ph-file-text' },
-                { id: 'orders', name: '訂貨與採購 (拋轉)', icon: 'ph-shopping-cart' },
-                { id: 'logistics', name: '出貨任務 (司機端)', icon: 'ph-truck' },
-                { id: 'invoices', name: '財務發票中樞', icon: 'ph-receipt' },
-                { id: 'inventory', name: '雲端商品庫', icon: 'ph-database' },
+                { id: 'quotations', name: '報價單 (列印)', icon: 'ph-file-text' },
+                { id: 'orders', name: '訂貨與採購 (列印)', icon: 'ph-shopping-cart' },
+                { id: 'logistics', name: '出貨任務看板', icon: 'ph-truck' }
             ];
 
             return (
                 <div className="flex h-screen w-full bg-slate-50 font-sans text-slate-800 overflow-hidden">
-                    {/* 左側邊欄 (桌機版) */}
-                    <aside className="hidden md:flex w-72 bg-slate-900 h-full text-white flex-col shadow-2xl z-20 shrink-0">
+                    <aside className="hidden md:flex w-72 bg-slate-900 h-full text-white flex-col shadow-2xl z-20 shrink-0 no-print">
                         <div className="p-6 border-b border-slate-800">
-                            <h1 className="text-xl font-bold tracking-wider flex items-center gap-2 mb-2">申堡中樞 <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded font-mono">v2.0</span></h1>
+                            <h1 className="text-xl font-bold tracking-wider flex items-center gap-2 mb-2">申堡中樞 <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded font-mono">v2.1 防呆版</span></h1>
                         </div>
                         <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
                             {menuItems.map(item => (
-                                <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-200 font-bold tracking-wide ${activeTab === item.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40 transform translate-x-1' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}>
+                                <button key={item.id} onClick={() => { setActiveTab(item.id); setPrintDoc(null); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-200 font-bold tracking-wide ${activeTab === item.id && !printDoc ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40 transform translate-x-1' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}>
                                     <i className={`ph ${item.icon} text-xl`}></i> {item.name}
                                 </button>
                             ))}
@@ -460,30 +611,20 @@
                         </div>
                     </aside>
 
-                    {/* 主要內容區 */}
-                    <main className="flex-1 h-full relative bg-slate-50/50">
-                        {toast && <div className="fixed top-6 right-6 px-6 py-4 rounded-2xl shadow-2xl bg-slate-900 text-white border-l-4 border-emerald-500 z-[110] animate-slide-in font-bold flex items-center gap-3"><i className="ph-fill ph-check-circle text-emerald-500 text-xl"></i> {toast}</div>}
+                    <main className="flex-1 h-full relative bg-slate-50/50 overflow-y-auto print-container">
+                        {toast && <div className="fixed top-6 right-6 px-6 py-4 rounded-2xl shadow-2xl bg-slate-900 text-white border-l-4 border-emerald-500 z-[110] animate-slide-in font-bold flex items-center gap-3 no-print"><i className="ph-fill ph-check-circle text-emerald-500 text-xl"></i> {toast}</div>}
                         
-                        <div className="h-full overflow-y-auto pb-24 md:pb-0">
-                            {activeTab === 'dashboard' && renderDashboard()}
-                            {activeTab === 'quotations' && renderQuotations()}
-                            {activeTab === 'orders' && renderOrders()}
-                            {activeTab === 'logistics' && renderLogistics()}
-                            {activeTab === 'invoices' && renderInvoices()}
-                            {activeTab === 'inventory' && renderProducts()}
-                        </div>
+                        {!printDoc && activeTab === 'dashboard' && renderDashboard()}
+                        {!printDoc && activeTab === 'quotations' && renderQuotations()}
+                        {!printDoc && activeTab === 'orders' && renderOrders()}
+                        {!printDoc && activeTab === 'logistics' && renderLogistics()}
                     </main>
 
-                    {/* 行動裝置底部導航 (Mobile Navigation) */}
-                    <nav className="md:hidden fixed bottom-0 w-full bg-white border-t border-slate-200 p-2 z-50 flex justify-around shadow-[0_-10px_40px_rgba(0,0,0,0.05)] pb-safe">
-                        {[
-                            { id: 'dashboard', icon: 'ph-chart-pie' },
-                            { id: 'quotations', icon: 'ph-file-text' },
-                            { id: 'logistics', icon: 'ph-truck' }, // 行動版特別強調物流
-                            { id: 'orders', icon: 'ph-shopping-cart' }
-                        ].map(item => (
-                            <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex flex-col items-center p-2 rounded-xl transition-all ${activeTab === item.id ? 'text-indigo-600 bg-indigo-50 scale-110' : 'text-slate-400 hover:text-slate-600'}`}>
-                                <i className={`ph ${activeTab === item.id ? 'ph-fill' : ''} ${item.icon} text-2xl`}></i>
+                    {/* 行動裝置底部導航 */}
+                    <nav className="md:hidden fixed bottom-0 w-full bg-white border-t border-slate-200 p-2 z-50 flex justify-around shadow-[0_-10px_40px_rgba(0,0,0,0.05)] pb-safe no-print">
+                        {menuItems.map(item => (
+                            <button key={item.id} onClick={() => { setActiveTab(item.id); setPrintDoc(null); }} className={`flex flex-col items-center p-2 rounded-xl transition-all ${activeTab === item.id && !printDoc ? 'text-indigo-600 bg-indigo-50 scale-110' : 'text-slate-400 hover:text-slate-600'}`}>
+                                <i className={`ph ${activeTab === item.id && !printDoc ? 'ph-fill' : ''} ${item.icon} text-2xl`}></i>
                             </button>
                         ))}
                     </nav>
