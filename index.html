@@ -105,9 +105,9 @@
             const [orders, setOrders] = useState(() => JSON.parse(localStorage.getItem('shenbao_orders') || '[]'));
             const [logistics, setLogistics] = useState(() => JSON.parse(localStorage.getItem('shenbao_logistics') || '[]'));
 
-            // --- 報價單系統狀態 (優化版) ---
+            // --- 估價單系統狀態 ---
             const [quoteView, setQuoteView] = useState('list'); 
-            const [editingQuoteId, setEditingQuoteId] = useState(null); // 追蹤目前是新增還是修改
+            const [editingQuoteId, setEditingQuoteId] = useState(null);
             const [newQuoteData, setNewQuoteData] = useState({ client: '', date: getToday(), items: [] });
             
             // --- 智慧搜尋框狀態 ---
@@ -117,13 +117,11 @@
             const [qty, setQty] = useState(1);
             const [showDropdown, setShowDropdown] = useState(false);
 
-            // 根據輸入即時過濾商品
             const filteredProducts = productMaster.filter(p => 
                 (p.name || '').toLowerCase().includes(quoteSearch.toLowerCase()) || 
                 (p.id || '').toLowerCase().includes(quoteSearch.toLowerCase())
             );
 
-            // --- 資料同步機制 ---
             useEffect(() => { localStorage.setItem('shenbao_products', JSON.stringify(productMaster)); }, [productMaster]);
             useEffect(() => { localStorage.setItem('shenbao_invoices', JSON.stringify(invoices)); }, [invoices]);
             useEffect(() => { localStorage.setItem('shenbao_quotes', JSON.stringify(quotes)); }, [quotes]);
@@ -132,14 +130,13 @@
 
             const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
-            // 觸發列印黑科技
             const handlePrint = (type, data) => {
                 setPrintDoc({ type, data });
-                setTimeout(() => window.print(), 300); // 給予 React 渲染版面的時間
+                setTimeout(() => window.print(), 300);
             };
 
             // ==========================================
-            // 報表引擎 (Print Engine) - 精準對齊您的版型
+            // 報表引擎 (Print Engine)
             // ==========================================
             if (printDoc) {
                 if (printDoc.type === 'quote') {
@@ -147,7 +144,7 @@
                     const q = printDoc.data;
                     const qTotal = (q.amount || 0);
                     return (
-                        <div className="bg-white text-black min-h-screen p-10 font-serif print-container animate-slide-in max-w-4xl mx-auto">
+                        <div className="bg-white text-black min-h-screen p-10 font-serif print-container animate-slide-in max-w-4xl mx-auto relative">
                             <div className="no-print mb-8 p-4 bg-indigo-50 border border-indigo-200 rounded-xl flex justify-between items-center shadow-lg">
                                 <span className="font-bold text-indigo-800"><i className="ph-fill ph-printer"></i> 報表預覽模式：請使用瀏覽器列印功能 (Ctrl+P) 匯出 PDF</span>
                                 <div className="flex gap-4">
@@ -156,7 +153,6 @@
                                 </div>
                             </div>
                             
-                            {/* 正式報表內容 */}
                             <h1 className="text-center text-4xl font-bold tracking-[1em] mb-10 ml-4">估價單</h1>
                             <div className="flex justify-between items-end mb-4 text-lg">
                                 <div className="font-bold border-b border-black pb-1 min-w-[300px]">
@@ -192,7 +188,6 @@
                                             <td className="border border-black p-3"></td>
                                         </tr>
                                     ))}
-                                    {/* 以下空白列 */}
                                     <tr>
                                         <td className="border border-black p-3 text-left">以下空白</td>
                                         <td className="border border-black p-3"></td>
@@ -201,7 +196,6 @@
                                         <td className="border border-black p-3"></td>
                                         <td className="border border-black p-3"></td>
                                     </tr>
-                                    {/* 空白填充，維持版面高度 */}
                                     {[...Array(4)].map((_, i) => (
                                         <tr key={`empty-${i}`}>
                                             <td className="border border-black p-5"></td><td className="border border-black p-5"></td><td className="border border-black p-5"></td><td className="border border-black p-5"></td><td className="border border-black p-5"></td><td className="border border-black p-5"></td>
@@ -217,17 +211,24 @@
                                     </tr>
                                 </tbody>
                             </table>
-                            {/* 印章預留區 */}
-                            <div className="mt-20 flex justify-end pr-10 opacity-30 border-2 border-dashed border-red-200 w-32 h-32 ml-auto items-center text-center text-red-400 text-sm">
-                                [公司大章<br/>預留位置]
+                            
+                            {/* 真實印章疊印區塊 (透墨技術 - 替換為 因張good.png) */}
+                            <div className="mt-8 flex justify-end pr-16 relative">
+                                <img 
+                                    src="./因張good.png" 
+                                    alt="申堡印章 (若未顯示請確認已上傳 因張good.png 到 GitHub)" 
+                                    className="w-48 h-auto object-contain z-10"
+                                    style={{ mixBlendMode: 'multiply' }}
+                                    onError={(e) => { e.target.style.opacity = '0.3'; e.target.alt="[圖檔 因張good.png 遺失]"; }}
+                                />
                             </div>
                         </div>
                     );
                 } else if (printDoc.type === 'order') {
-                    // --- 訂貨明細單報表 (維持上一版良好設定) ---
+                    // --- 訂貨明細單報表 ---
                     const o = printDoc.data;
                     return (
-                        <div className="bg-white text-black min-h-screen p-10 font-sans print-container animate-slide-in max-w-4xl mx-auto">
+                        <div className="bg-white text-black min-h-screen p-10 font-sans print-container animate-slide-in max-w-4xl mx-auto relative">
                             <div className="no-print mb-8 p-4 bg-amber-50 border border-amber-200 rounded-xl flex justify-between items-center shadow-lg">
                                 <span className="font-bold text-amber-800"><i className="ph-fill ph-printer"></i> 報表預覽模式：請使用瀏覽器列印功能 (Ctrl+P) 匯出 PDF</span>
                                 <div className="flex gap-4">
@@ -237,12 +238,21 @@
                             </div>
 
                             <div className="flex justify-between items-start mb-6 border-b-2 border-black pb-6">
-                                <div className="text-lg space-y-1">
+                                <div className="text-lg space-y-1 relative">
                                     <h2 className="text-2xl font-black mb-2">{companyInfo.name}</h2>
                                     <p>統一編號: {companyInfo.taxId}</p>
                                     <p>店址: {companyInfo.address}</p>
                                     <p>電話: {companyInfo.phone}</p>
                                     <p>傳真: {companyInfo.fax}</p>
+                                    
+                                    {/* 訂貨單左上角印章疊印區塊 (替換為 因張good.png) */}
+                                    <img 
+                                        src="./因張good.png" 
+                                        alt="" 
+                                        className="absolute -right-32 top-0 w-36 h-auto object-contain z-10"
+                                        style={{ mixBlendMode: 'multiply' }}
+                                        onError={(e) => { e.target.style.display = 'none'; }}
+                                    />
                                 </div>
                                 <div className="text-right">
                                     <h1 className="text-4xl font-black tracking-widest mb-6">訂貨明細單</h1>
@@ -276,7 +286,6 @@
                                             <td className="border border-black p-4 text-left text-sm text-slate-500">來源: {o.client}</td>
                                         </tr>
                                     ))}
-                                    {/* 空白填充 */}
                                     {[...Array(5)].map((_, i) => (
                                         <tr key={`empty-${i}`}>
                                             <td className="border border-black p-6"></td><td className="border border-black p-6"></td><td className="border border-black p-6"></td><td className="border border-black p-6"></td><td className="border border-black p-6"></td>
@@ -293,14 +302,14 @@
             }
 
             // ==========================================
-            // 1. 營運全景儀表板 (Dashboard)
+            // Dashboard / CRUD Logic 保持優化版一致
             // ==========================================
             const renderDashboard = () => (
                 <div className="p-8 animate-slide-in max-w-7xl mx-auto no-print">
                     <h2 className="text-2xl font-bold tracking-wider text-slate-800 mb-6">營運全景儀表板</h2>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                         <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm border-l-4 border-l-blue-500">
-                            <p className="text-slate-500 text-sm font-bold tracking-widest uppercase mb-1">本月累計報價金額</p>
+                            <p className="text-slate-500 text-sm font-bold tracking-widest uppercase mb-1">本月累計估價金額</p>
                             <h3 className="text-3xl font-black text-slate-800 font-mono">${(quotes.reduce((s,q)=>s+(q.amount||0),0)).toLocaleString()}</h3>
                         </div>
                         <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
@@ -315,14 +324,10 @@
                 </div>
             );
 
-            // ==========================================
-            // 2. 報價單系統 (Quotations - 強制升級版)
-            // ==========================================
             const handleAddQuoteItem = () => {
                 if (!newQuoteData.client) return showToast("請先填寫客戶名稱");
                 if (!quoteSearch.trim()) return showToast("請輸入或選擇產品名稱");
                 
-                // 允許使用者手動輸入新商品 (即便不在主檔內)
                 const priceNum = parseFloat(customPrice) || 0;
                 
                 setNewQuoteData({ 
@@ -332,12 +337,10 @@
                         specs: customSpec, 
                         unitPrice: priceNum, 
                         qty: qty || 1,
-                        // 嘗試尋找對應的供應商，如果找不到就留白
                         supplier: productMaster.find(p => p.name === quoteSearch)?.supplier || '' 
                     }] 
                 });
                 
-                // 清空輸入框
                 setQuoteSearch(''); setCustomSpec(''); setCustomPrice(''); setQty(1); setShowDropdown(false);
             };
 
@@ -349,7 +352,7 @@
             const quoteTotal = (newQuoteData.items || []).reduce((sum, item) => sum + ((item.unitPrice || 0) * (item.qty || 0)), 0);
 
             const handleSaveQuote = () => {
-                if ((newQuoteData.items || []).length === 0) return showToast("報價單內必須至少有一項商品");
+                if ((newQuoteData.items || []).length === 0) return showToast("估價單內必須至少有一項商品");
                 if (!newQuoteData.client) return showToast("請填寫客戶名稱");
 
                 const updatedQuote = {
@@ -363,10 +366,10 @@
 
                 if (editingQuoteId) {
                     setQuotes(quotes.map(q => q.id === editingQuoteId ? updatedQuote : q));
-                    showToast("報價單已成功修改儲存");
+                    showToast("估價單已成功修改儲存");
                 } else {
                     setQuotes([updatedQuote, ...quotes]);
-                    showToast("全新報價單已建立");
+                    showToast("全新估價單已建立");
                 }
                 
                 setQuoteView('list');
@@ -374,24 +377,22 @@
                 setNewQuoteData({ client: '', date: getToday(), items: [] });
             };
 
-            // CRUD 操作：進入編輯模式
             const handleEditQuote = (q) => {
                 setEditingQuoteId(q.id);
                 setNewQuoteData({ ...q });
                 setQuoteView('create');
             };
 
-            // CRUD 操作：刪除
             const handleDeleteQuote = (id) => {
-                if (window.confirm("確定要刪除這筆報價單嗎？此操作無法還原。")) {
+                if (window.confirm("確定要刪除這筆估價單嗎？此操作無法還原。")) {
                     setQuotes(quotes.filter(q => q.id !== id));
-                    showToast("報價單已刪除");
+                    showToast("估價單已刪除");
                 }
             };
 
             const confirmQuote = (id) => {
                 setQuotes(quotes.map(q => q.id === id ? { ...q, status: '已確認' } : q));
-                showToast(`報價單 ${id} 已確認，請前往「訂貨系統」拋轉`);
+                showToast(`估價單 ${id} 已確認，請前往「訂貨系統」拋轉`);
             };
 
             const renderQuotations = () => {
@@ -400,7 +401,7 @@
                         <div className="p-8 animate-slide-in max-w-7xl mx-auto no-print">
                             <div className="flex justify-between items-center mb-6">
                                 <h2 className="text-2xl font-bold tracking-wider text-slate-800">
-                                    {editingQuoteId ? `編輯報價單 (${editingQuoteId})` : '新增報價單'}
+                                    {editingQuoteId ? `編輯估價單 (${editingQuoteId})` : '新增估價單'}
                                 </h2>
                                 <button onClick={() => { setQuoteView('list'); setEditingQuoteId(null); setNewQuoteData({client: '', date: getToday(), items: []}) }} className="text-slate-500 hover:text-slate-800 font-bold bg-white px-4 py-2 rounded-xl shadow-sm"><i className="ph ph-arrow-left"></i> 放棄變更並返回</button>
                             </div>
@@ -431,7 +432,6 @@
                                             className="w-full px-4 py-3 border border-indigo-200 rounded-xl shadow-sm focus:border-indigo-500 bg-white font-bold text-indigo-900" 
                                             placeholder="手動輸入 或 搜尋主檔..." 
                                         />
-                                        {/* 下拉智慧選單 */}
                                         {showDropdown && quoteSearch && (
                                             <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
                                                 <div className="p-2 flex justify-between items-center bg-slate-50 border-b text-xs text-slate-400 font-bold">
@@ -506,7 +506,7 @@
                                         <div className="text-right">
                                             <div className="text-3xl font-black text-slate-800 mb-4 font-mono">總計: ${(quoteTotal || 0).toLocaleString()}</div>
                                             <button onClick={handleSaveQuote} className="bg-emerald-600 text-white px-8 py-4 rounded-xl font-black hover:bg-emerald-700 shadow-lg text-lg flex items-center gap-2">
-                                                <i className="ph-fill ph-floppy-disk"></i> {editingQuoteId ? '更新報價單' : '建立報價單'}
+                                                <i className="ph-fill ph-floppy-disk"></i> {editingQuoteId ? '更新估價單' : '建立估價單'}
                                             </button>
                                         </div>
                                     </div>
@@ -518,9 +518,9 @@
                 return (
                     <div className="p-8 animate-slide-in max-w-7xl mx-auto no-print">
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-bold tracking-wider text-slate-800">報價單總覽 <span className="text-sm font-normal text-slate-500">(支援 CRUD 與智慧搜尋)</span></h2>
+                            <h2 className="text-2xl font-bold tracking-wider text-slate-800">估價單總覽 <span className="text-sm font-normal text-slate-500">(支援 CRUD 與智慧搜尋)</span></h2>
                             <button onClick={() => { setQuoteView('create'); setEditingQuoteId(null); setNewQuoteData({client: '', date: getToday(), items: []})}} className="bg-indigo-600 text-white px-6 py-3 rounded-xl hover:bg-indigo-700 font-black shadow-lg flex items-center gap-2">
-                                <i className="ph-bold ph-plus-circle"></i> 建立新報價
+                                <i className="ph-bold ph-plus-circle"></i> 建立新估價
                             </button>
                         </div>
                         <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
@@ -536,10 +536,7 @@
                                             <td className="p-5 text-right font-black text-slate-700 font-mono text-lg">${(q.amount || 0).toLocaleString()}</td>
                                             <td className="p-5 text-center"><span className={`px-3 py-1 rounded-full text-xs font-bold ${q.status==='已確認'?'bg-emerald-100 text-emerald-700 border border-emerald-200':'bg-amber-100 text-amber-700 border border-amber-200'}`}>{q.status}</span></td>
                                             <td className="p-5 text-center flex justify-center items-center gap-2 flex-wrap max-w-[250px] mx-auto">
-                                                {/* 報表匯出 */}
                                                 <button onClick={() => handlePrint('quote', q)} className="text-indigo-600 font-bold bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg text-xs hover:bg-indigo-100 flex items-center gap-1 shadow-sm w-full justify-center mb-1"><i className="ph-bold ph-printer"></i> 匯出報表 / 列印</button>
-                                                
-                                                {/* CRUD 操作按鈕群 */}
                                                 {q.status !== '已確認' && (
                                                     <button onClick={()=>confirmQuote(q.id)} className="bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-600 shadow-sm flex-1"><i className="ph-bold ph-check"></i> 確認</button>
                                                 )}
@@ -548,7 +545,7 @@
                                             </td>
                                         </tr>
                                     ))}
-                                    {quotes.length === 0 && <tr><td colSpan="5" className="p-16 text-center text-slate-400 font-bold">尚無報價單紀錄，請點擊右上方建立。</td></tr>}
+                                    {quotes.length === 0 && <tr><td colSpan="5" className="p-16 text-center text-slate-400 font-bold">尚無估價單紀錄，請點擊右上方建立。</td></tr>}
                                 </tbody>
                             </table>
                         </div>
@@ -556,12 +553,9 @@
                 );
             };
 
-            // ==========================================
-            // 3. 訂貨與採購 (智慧拋轉)
-            // ==========================================
             const generateOrdersFromQuotes = () => {
                 const confirmedQuotes = (quotes || []).filter(q => q.status === '已確認');
-                if (confirmedQuotes.length === 0) return showToast("目前沒有可拋轉的報價單");
+                if (confirmedQuotes.length === 0) return showToast("目前沒有可拋轉的估價單");
 
                 let newOrdersAdded = 0;
                 let newLogisticsAdded = 0;
@@ -607,7 +601,7 @@
                     setLogistics(newLogisticsList);
                     showToast(`成功拋轉！共產生 ${newOrdersAdded} 張訂貨單與 ${newLogisticsAdded} 張出貨任務。`);
                 } else {
-                    showToast("所有已確認報價單皆已拋轉過。");
+                    showToast("所有已確認估價單皆已拋轉過。");
                 }
             };
 
@@ -620,7 +614,7 @@
                     <div className="bg-indigo-50 border border-indigo-200 rounded-[2rem] p-8 mb-8 relative overflow-hidden shadow-sm">
                         <div className="absolute right-[-20px] top-[-20px] opacity-10"><i className="ph-fill ph-magic-wand text-9xl text-indigo-500"></i></div>
                         <h3 className="font-black text-xl text-indigo-900 mb-2 relative z-10">智慧拆單引擎</h3>
-                        <p className="text-sm text-indigo-700 mb-6 font-bold relative z-10">系統將自動撈取狀態為「已確認」的報價單，依供應商屬性精準拆分為對原廠的訂貨單。</p>
+                        <p className="text-sm text-indigo-700 mb-6 font-bold relative z-10">系統將自動撈取狀態為「已確認」的估價單，依供應商屬性精準拆分為對原廠的訂貨單。</p>
                         <button onClick={generateOrdersFromQuotes} className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-black hover:bg-indigo-700 shadow-lg relative z-10 transition-transform active:scale-95">
                             <i className="ph-bold ph-magic-wand"></i> 一鍵拋轉產生訂貨單
                         </button>
@@ -629,7 +623,7 @@
                     <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
                         <table className="w-full text-left">
                             <thead className="bg-slate-50 border-b border-slate-200">
-                                <tr><th className="p-5 text-xs font-black text-slate-400">訂貨單號</th><th className="p-5 text-xs font-black text-slate-400">供應商</th><th className="p-5 text-xs font-black text-slate-400">對應客戶(報價單)</th><th className="p-5 text-xs font-black text-slate-400 text-center">狀態</th><th className="p-5 text-xs font-black text-slate-400 text-center">操作</th></tr>
+                                <tr><th className="p-5 text-xs font-black text-slate-400">訂貨單號</th><th className="p-5 text-xs font-black text-slate-400">供應商</th><th className="p-5 text-xs font-black text-slate-400">對應客戶(估價單)</th><th className="p-5 text-xs font-black text-slate-400 text-center">狀態</th><th className="p-5 text-xs font-black text-slate-400 text-center">操作</th></tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {(orders || []).length === 0 && <tr><td colSpan="5" className="p-10 text-center text-slate-400 font-bold">目前無訂貨單資料</td></tr>}
@@ -652,9 +646,6 @@
                 </div>
             );
 
-            // ==========================================
-            // 4. 司機端出貨看版 (保留原本設定)
-            // ==========================================
             const updateLogisticsStatus = (id, currentStatus) => {
                 const nextStatus = currentStatus === '待進貨' ? '準備出車' : '已送達';
                 setLogistics(logistics.map(l => l.id === id ? { ...l, status: nextStatus } : l));
@@ -708,7 +699,7 @@
             // ==========================================
             const menuItems = [
                 { id: 'dashboard', name: '營運儀表板', icon: 'ph-chart-pie' },
-                { id: 'quotations', name: '報價單 (列印/修改)', icon: 'ph-file-text' },
+                { id: 'quotations', name: '估價單 (列印/修改)', icon: 'ph-file-text' },
                 { id: 'orders', name: '訂貨與採購 (列印)', icon: 'ph-shopping-cart' },
                 { id: 'logistics', name: '出貨任務看板', icon: 'ph-truck' }
             ];
@@ -717,7 +708,7 @@
                 <div className="flex h-screen w-full bg-slate-50 font-sans text-slate-800 overflow-hidden">
                     <aside className="hidden md:flex w-72 bg-slate-900 h-full text-white flex-col shadow-2xl z-20 shrink-0 no-print">
                         <div className="p-6 border-b border-slate-800">
-                            <h1 className="text-xl font-bold tracking-wider flex items-center gap-2 mb-2">申堡中樞 <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded font-mono">v3.0 旗艦版</span></h1>
+                            <h1 className="text-xl font-bold tracking-wider flex items-center gap-2 mb-2">申堡中樞 <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded font-mono">v3.1 印章版</span></h1>
                         </div>
                         <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
                             {menuItems.map(item => (
