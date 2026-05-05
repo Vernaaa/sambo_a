@@ -80,9 +80,9 @@
             // --- 系統狀態 ---
             const [activeTab, setActiveTab] = useState('dashboard');
             const [toast, setToast] = useState(null);
-            const [printDoc, setPrintDoc] = useState(null); // 報表預覽
+            const [printDoc, setPrintDoc] = useState(null);
 
-            // --- 核心資料庫 (本機快取優先) ---
+            // --- 核心資料庫 ---
             const [productMaster, setProductMaster] = useState(() => {
                 const saved = localStorage.getItem('shenbao_products');
                 return saved ? JSON.parse(saved) : [
@@ -104,7 +104,8 @@
             // --- 估價單系統狀態 ---
             const [quoteView, setQuoteView] = useState('list'); 
             const [editingQuoteId, setEditingQuoteId] = useState(null);
-            const [newQuoteData, setNewQuoteData] = useState({ client: '', clientPhone: '', date: getToday(), items: [] });
+            // ⭐️ 加入 contactName 與 contactPhone
+            const [newQuoteData, setNewQuoteData] = useState({ client: '', contactName: '', contactPhone: '', date: getToday(), items: [] });
             
             // --- 智慧搜尋框狀態 ---
             const [quoteSearch, setQuoteSearch] = useState('');
@@ -133,12 +134,16 @@
             };
 
             // ==========================================
-            // 報表引擎 (Print Engine - 包含客戶電話與印章)
+            // 報表引擎 (Print Engine)
             // ==========================================
             if (printDoc) {
                 if (printDoc.type === 'quote') {
+                    // --- 估價單報表 ---
                     const q = printDoc.data;
                     const qTotal = (q.amount || 0);
+                    // 兼容舊單據的 clientPhone
+                    const displayPhone = q.contactPhone || q.clientPhone || '未提供';
+                    
                     return (
                         <div className="bg-white text-black min-h-screen p-10 font-serif print-container animate-slide-in max-w-4xl mx-auto relative">
                             <div className="no-print mb-8 p-4 bg-indigo-50 border border-indigo-200 rounded-xl flex justify-between items-center shadow-lg">
@@ -155,7 +160,8 @@
                                     {q.client} <span className="ml-10">台照</span>
                                 </div>
                                 <div className="text-right">
-                                    電話: <span className="font-sans">{q.clientPhone || '未提供聯絡電話'}</span>
+                                    {/* ⭐️ 將聯絡人與電話合併顯示在右上角 */}
+                                    聯絡人: {q.contactName || '未指定'} &nbsp;&nbsp; 電話: <span className="font-sans">{displayPhone}</span>
                                 </div>
                             </div>
                             <div className="mb-6 text-lg tracking-wider font-bold">
@@ -220,6 +226,7 @@
                         </div>
                     );
                 } else if (printDoc.type === 'order') {
+                    // --- 訂貨明細單報表 ---
                     const o = printDoc.data;
                     return (
                         <div className="bg-white text-black min-h-screen p-10 font-sans print-container animate-slide-in max-w-4xl mx-auto relative">
@@ -238,13 +245,6 @@
                                     <p>店址: {companyInfo.address}</p>
                                     <p>電話: {companyInfo.phone}</p>
                                     <p>傳真: {companyInfo.fax}</p>
-                                    <img 
-                                        src="./因張good.png" 
-                                        alt="" 
-                                        className="absolute -right-32 top-0 w-36 h-auto object-contain z-10"
-                                        style={{ mixBlendMode: 'multiply' }}
-                                        onError={(e) => { e.target.style.display = 'none'; }}
-                                    />
                                 </div>
                                 <div className="text-right">
                                     <h1 className="text-4xl font-black tracking-widest mb-6">訂貨明細單</h1>
@@ -285,6 +285,22 @@
                                     ))}
                                 </tbody>
                             </table>
+                            
+                            {/* ⭐️ 將訂貨單的印章移至文件末端，與備註文字並排對齊 */}
+                            <div className="mt-8 flex justify-between items-end">
+                                <div className="text-sm text-slate-500 pb-4">
+                                    本訂貨單由申堡營運中樞系統自動生成
+                                </div>
+                                <div className="pr-16 relative">
+                                    <img 
+                                        src="./因張good.png" 
+                                        alt="申堡印章" 
+                                        className="w-48 h-auto object-contain z-10"
+                                        style={{ mixBlendMode: 'multiply' }}
+                                        onError={(e) => { e.target.style.opacity = '0.3'; e.target.display = 'none'; }}
+                                    />
+                                </div>
+                            </div>
                         </div>
                     );
                 }
@@ -314,13 +330,11 @@
             );
 
             // ==========================================
-            // 1. 商品資料庫 (Products) 完整 CRUD
+            // 1. 商品資料庫 (Products)
             // ==========================================
             const handleSaveProduct = () => {
                 if (!newProductData.name) return showToast("請填寫商品名稱");
-                
                 const unitPriceNum = Number(newProductData.unitPrice) || 0;
-
                 if (editingProductId) {
                     setProductMaster(productMaster.map(p => p.id === editingProductId ? { ...newProductData, unitPrice: unitPriceNum } : p));
                     showToast("商品資料已更新");
@@ -329,7 +343,6 @@
                     setProductMaster([{ ...newProductData, id: newId, unitPrice: unitPriceNum }, ...productMaster]);
                     showToast("新商品已建檔");
                 }
-                
                 setProductView('list');
                 setEditingProductId(null);
                 setNewProductData({ id: '', supplier: '', name: '', specs: '', unitPrice: 0 });
@@ -476,7 +489,8 @@
                 const updatedQuote = {
                     id: editingQuoteId || `Q-${getToday().replace(/-/g,'')}-${String(quotes.length+1).padStart(3,'0')}`,
                     client: newQuoteData.client,
-                    clientPhone: newQuoteData.clientPhone || '',
+                    contactName: newQuoteData.contactName || '',
+                    contactPhone: newQuoteData.contactPhone || newQuoteData.clientPhone || '',
                     date: newQuoteData.date || getToday(),
                     amount: quoteTotal,
                     status: newQuoteData.status || '草稿',
@@ -493,7 +507,7 @@
                 
                 setQuoteView('list');
                 setEditingQuoteId(null);
-                setNewQuoteData({ client: '', clientPhone: '', date: getToday(), items: [] });
+                setNewQuoteData({ client: '', contactName: '', contactPhone: '', date: getToday(), items: [] });
             };
 
             const handleEditQuote = (q) => {
@@ -522,7 +536,7 @@
                                 <h2 className="text-2xl font-bold tracking-wider text-slate-800">
                                     {editingQuoteId ? `編輯估價單 (${editingQuoteId})` : '新增估價單'}
                                 </h2>
-                                <button onClick={() => { setQuoteView('list'); setEditingQuoteId(null); setNewQuoteData({client: '', clientPhone: '', date: getToday(), items: []}) }} className="text-slate-500 bg-white px-4 py-2 rounded-xl shadow-sm"><i className="ph ph-arrow-left"></i> 返回</button>
+                                <button onClick={() => { setQuoteView('list'); setEditingQuoteId(null); setNewQuoteData({client: '', contactName: '', contactPhone: '', date: getToday(), items: []}) }} className="text-slate-500 bg-white px-4 py-2 rounded-xl shadow-sm"><i className="ph ph-arrow-left"></i> 返回</button>
                             </div>
                             
                             <div className="bg-white rounded-[2rem] border border-slate-200 p-6 mb-6 shadow-sm">
@@ -530,11 +544,16 @@
                                     <div className="col-span-2 md:col-span-4 flex gap-4">
                                         <div className="flex-[2]">
                                             <label className="block text-xs font-black text-slate-400 mb-2">客戶台照 <span className="text-red-500">*</span></label>
-                                            <input type="text" value={newQuoteData.client} onChange={(e) => setNewQuoteData({...newQuoteData, client: e.target.value})} className="w-full px-4 py-3 border rounded-xl" />
+                                            <input type="text" value={newQuoteData.client} onChange={(e) => setNewQuoteData({...newQuoteData, client: e.target.value})} className="w-full px-4 py-3 border rounded-xl" placeholder="例：澎湖縣政府環保局" />
+                                        </div>
+                                        {/* ⭐️ 將聯絡資訊拆分為聯絡人與電話 */}
+                                        <div className="flex-[1]">
+                                            <label className="block text-xs font-black text-slate-400 mb-2">聯絡人</label>
+                                            <input type="text" value={newQuoteData.contactName || ''} onChange={(e) => setNewQuoteData({...newQuoteData, contactName: e.target.value})} className="w-full px-4 py-3 border rounded-xl" placeholder="例：王小明" />
                                         </div>
                                         <div className="flex-[1]">
-                                            <label className="block text-xs font-black text-slate-400 mb-2">聯絡電話</label>
-                                            <input type="text" value={newQuoteData.clientPhone || ''} onChange={(e) => setNewQuoteData({...newQuoteData, clientPhone: e.target.value})} className="w-full px-4 py-3 border rounded-xl" />
+                                            <label className="block text-xs font-black text-slate-400 mb-2">連絡電話</label>
+                                            <input type="text" value={newQuoteData.contactPhone || newQuoteData.clientPhone || ''} onChange={(e) => setNewQuoteData({...newQuoteData, contactPhone: e.target.value})} className="w-full px-4 py-3 border rounded-xl" placeholder="例：0912-345-678" />
                                         </div>
                                         <div className="w-48">
                                             <label className="block text-xs font-black text-slate-400 mb-2">開立日期</label>
@@ -617,18 +636,23 @@
                     <div className="p-8 animate-slide-in max-w-7xl mx-auto no-print">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-2xl font-bold tracking-wider text-slate-800">估價單總覽</h2>
-                            <button onClick={() => { setQuoteView('create'); setEditingQuoteId(null); setNewQuoteData({client: '', clientPhone: '', date: getToday(), items: []})}} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-black shadow-lg"><i className="ph-bold ph-plus-circle"></i> 建立新估價</button>
+                            <button onClick={() => { setQuoteView('create'); setEditingQuoteId(null); setNewQuoteData({client: '', contactName: '', contactPhone: '', date: getToday(), items: []})}} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-black shadow-lg"><i className="ph-bold ph-plus-circle"></i> 建立新估價</button>
                         </div>
                         <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
                             <table className="w-full text-left">
                                 <thead className="bg-slate-50 border-b">
-                                    <tr><th className="p-5">單號/日期</th><th className="p-5">客戶/聯絡</th><th className="p-5 text-right">金額</th><th className="p-5 text-center">狀態</th><th className="p-5 text-center">單據操作</th></tr>
+                                    <tr><th className="p-5">單號/日期</th><th className="p-5">客戶/聯絡資訊</th><th className="p-5 text-right">金額</th><th className="p-5 text-center">狀態</th><th className="p-5 text-center">單據操作</th></tr>
                                 </thead>
                                 <tbody>
                                     {(quotes || []).map(q => (
                                         <tr key={q.id} className="border-b">
                                             <td className="p-5 font-bold">{q.id}<div className="text-xs font-normal text-slate-500">{q.date}</div></td>
-                                            <td className="p-5 font-bold">{q.client}<div className="text-xs font-normal text-slate-500">{q.clientPhone}</div></td>
+                                            <td className="p-5 font-bold">
+                                                {q.client}
+                                                <div className="text-xs font-normal text-slate-500 mt-1">
+                                                    {q.contactName ? `${q.contactName} / ` : ''}{q.contactPhone || q.clientPhone || '無電話'}
+                                                </div>
+                                            </td>
                                             <td className="p-5 text-right font-black">${(q.amount || 0).toLocaleString()}</td>
                                             <td className="p-5 text-center"><span className="px-3 py-1 bg-slate-100 rounded-full text-xs">{q.status}</span></td>
                                             <td className="p-5 text-center flex flex-wrap gap-2 justify-center max-w-[200px] mx-auto">
@@ -647,7 +671,7 @@
             };
 
             // ==========================================
-            // 3. & 4. Orders & Logistics (縮略邏輯，維持功能)
+            // 3. & 4. Orders & Logistics
             // ==========================================
             const generateOrdersFromQuotes = () => {
                 const confirmedQuotes = (quotes || []).filter(q => q.status === '已確認');
@@ -720,7 +744,7 @@
             // ==========================================
             const menuItems = [
                 { id: 'dashboard', name: '營運儀表板', icon: 'ph-chart-pie' },
-                { id: 'products', name: '商品資料庫', icon: 'ph-database' }, // ⭐️ 新增商品資料庫選單
+                { id: 'products', name: '商品資料庫', icon: 'ph-database' },
                 { id: 'quotations', name: '估價單 (列印)', icon: 'ph-file-text' },
                 { id: 'orders', name: '訂貨與採購', icon: 'ph-shopping-cart' },
                 { id: 'logistics', name: '出貨看板', icon: 'ph-truck' }
@@ -730,7 +754,7 @@
                 <div className="flex h-screen w-full bg-slate-50 font-sans text-slate-800 overflow-hidden">
                     <aside className="hidden md:flex w-72 bg-slate-900 h-full text-white flex-col shadow-2xl z-20 shrink-0 no-print">
                         <div className="p-6 border-b border-slate-800">
-                            <h1 className="text-xl font-bold tracking-wider flex items-center gap-2 mb-2">申堡中樞 <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded font-mono">v3.2 完整版</span></h1>
+                            <h1 className="text-xl font-bold tracking-wider flex items-center gap-2 mb-2">申堡中樞 <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded font-mono">v3.3 細節打磨版</span></h1>
                         </div>
                         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
                             {menuItems.map(item => (
@@ -751,7 +775,7 @@
                         {toast && <div className="fixed top-6 right-6 px-6 py-4 rounded-xl shadow-2xl bg-slate-900 text-white border-l-4 border-emerald-500 z-50 font-bold">{toast}</div>}
                         
                         {!printDoc && activeTab === 'dashboard' && renderDashboard()}
-                        {!printDoc && activeTab === 'products' && renderProducts()} {/* ⭐️ 渲染商品模組 */}
+                        {!printDoc && activeTab === 'products' && renderProducts()}
                         {!printDoc && activeTab === 'quotations' && renderQuotations()}
                         {!printDoc && activeTab === 'orders' && renderOrders()}
                         {!printDoc && activeTab === 'logistics' && renderLogistics()}
