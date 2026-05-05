@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>申堡營運中樞系統 - 旗艦整合版 v5.8</title>
+    <title>申堡營運中樞系統 - 旗艦整合版 v5.9</title>
     
     <!-- 核心套件導入 -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -59,20 +59,20 @@
             const [confirmBox, setConfirmBox] = useState(null);
 
             // --- 數據持久化 ---
-            const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem('sb_p_v5_8') || '[]'));
-            const [quotes, setQuotes] = useState(() => JSON.parse(localStorage.getItem('sb_q_v5_8') || '[]'));
-            const [orders, setOrders] = useState(() => JSON.parse(localStorage.getItem('sb_o_v5_8') || '[]'));
-            const [logistics, setLogistics] = useState(() => JSON.parse(localStorage.getItem('sb_l_v5_8') || '[]'));
-            const [invoices, setInvoices] = useState(() => JSON.parse(localStorage.getItem('sb_i_v5_8') || '[]'));
-            const [inputInvoices, setInputInvoices] = useState(() => JSON.parse(localStorage.getItem('sb_input_v5_8') || '[]'));
+            const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem('sb_p_v5_9') || '[]'));
+            const [quotes, setQuotes] = useState(() => JSON.parse(localStorage.getItem('sb_q_v5_9') || '[]'));
+            const [orders, setOrders] = useState(() => JSON.parse(localStorage.getItem('sb_o_v5_9') || '[]'));
+            const [logistics, setLogistics] = useState(() => JSON.parse(localStorage.getItem('sb_l_v5_9') || '[]'));
+            const [invoices, setInvoices] = useState(() => JSON.parse(localStorage.getItem('sb_i_v5_9') || '[]'));
+            const [inputInvoices, setInputInvoices] = useState(() => JSON.parse(localStorage.getItem('sb_input_v5_9') || '[]'));
 
             useEffect(() => {
-                localStorage.setItem('sb_p_v5_8', JSON.stringify(products));
-                localStorage.setItem('sb_q_v5_8', JSON.stringify(quotes));
-                localStorage.setItem('sb_o_v5_8', JSON.stringify(orders));
-                localStorage.setItem('sb_l_v5_8', JSON.stringify(logistics));
-                localStorage.setItem('sb_i_v5_8', JSON.stringify(invoices));
-                localStorage.setItem('sb_input_v5_8', JSON.stringify(inputInvoices));
+                localStorage.setItem('sb_p_v5_9', JSON.stringify(products));
+                localStorage.setItem('sb_q_v5_9', JSON.stringify(quotes));
+                localStorage.setItem('sb_o_v5_9', JSON.stringify(orders));
+                localStorage.setItem('sb_l_v5_9', JSON.stringify(logistics));
+                localStorage.setItem('sb_i_v5_9', JSON.stringify(invoices));
+                localStorage.setItem('sb_input_v5_9', JSON.stringify(inputInvoices));
             }, [products, quotes, orders, logistics, invoices, inputInvoices]);
 
             const triggerToast = (m) => { showToast(m); setTimeout(() => showToast(null), 3000); };
@@ -122,7 +122,7 @@
             };
 
             // ==========================================
-            // ⭐️ 採購管理 (獨立新增)
+            // ⭐️ 採購管理
             // ==========================================
             const [oView, setOView] = useState('list');
             const [oForm, setOForm] = useState({ supplier: '', client: '', date: getToday(), items: [] });
@@ -145,7 +145,7 @@
             };
 
             // ==========================================
-            // ⭐️ 財務系統 (二三聯動態顯隱 + 號碼校驗)
+            // ⭐️ 財務系統
             // ==========================================
             const [invMode, setInvMode] = useState('銷項'); 
             const [invForm, setInvForm] = useState({ 
@@ -164,28 +164,22 @@
 
             const handleCreateInvoice = () => {
                 if (!invForm.client || invForm.totalAmount <= 0) return triggerToast("金額或對象不可為空");
-                
-                // 1. 三聯式統編校驗
                 if (invForm.category === '三聯式' && !/^\d{8}$/.test(invForm.taxId)) {
                     return triggerToast("三聯式發票必須輸入 8 位數統一編號");
                 }
-                
-                // 2. 發票號碼格式校驗 (AA-12345678)
                 const invPattern = /^[A-Z]{2}-\d{8}$/;
                 if (invForm.invNum && !invPattern.test(invForm.invNum)) {
                     return triggerToast("發票號碼格式錯誤！請使用大寫英文與8位數字，如：AB-12345678");
                 }
-
                 const finalInv = { ...invForm, id: generateId('INV') };
                 if (invMode === '銷項') setInvoices([finalInv, ...invoices]);
                 else setInputInvoices([finalInv, ...inputInvoices]);
-                
                 setInvForm({ category: '三聯式', taxId: '', invNum: '', client: '', netAmount: 0, taxAmount: 0, totalAmount: 0, date: getToday() });
                 triggerToast(`${invMode}發票紀錄已建立`);
             };
 
             // ==========================================
-            // ⭐️ 智慧備份與還原
+            // ⭐️ 數據備份與智慧還原
             // ==========================================
             const [importReview, setImportReview] = useState(null);
             const handleRestoreRequest = (e) => {
@@ -299,7 +293,7 @@
 
                     {/* 側邊導覽列 */}
                     <aside className="w-72 bg-slate-900 h-full text-white flex flex-col shrink-0 z-20 shadow-2xl">
-                        <div className="p-10 border-b border-slate-800"><h1 className="text-2xl font-black italic tracking-tighter uppercase leading-none text-blue-400">SHENBAO <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded ml-1 tracking-normal">v5.8</span></h1></div>
+                        <div className="p-10 border-b border-slate-800"><h1 className="text-2xl font-black italic tracking-tighter uppercase leading-none text-blue-400">SHENBAO <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded ml-1 tracking-normal">v5.9</span></h1></div>
                         <nav className="flex-1 p-6 space-y-2 overflow-y-auto custom-scrollbar">
                             {[
                                 { id: 'dashboard', name: '營運儀表板', icon: 'ph-layout' },
@@ -314,11 +308,11 @@
                                 </button>
                             ))}
                         </nav>
-                        <div className="p-8 bg-slate-950/40 border-t border-slate-800"><div className="flex items-center gap-4 p-2 bg-slate-800/50 rounded-3xl border border-white/5 shadow-inner"><div className="w-12 h-12 bg-gradient-to-tr from-blue-500 to-emerald-400 rounded-full flex items-center justify-center font-black shadow-lg">莊</div><div><div className="text-sm font-black text-slate-200 leading-none mb-1">莊惠呅</div><div className="text-[10px] text-slate-500 font-black tracking-widest">Administrator</div></div></div></div>
+                        <div className="p-8 bg-slate-950/40 border-t border-slate-800"><div className="flex items-center gap-4 p-2 bg-slate-800/50 rounded-3xl border border-white/5 shadow-inner"><div className="w-12 h-12 bg-gradient-to-tr from-blue-500 to-emerald-400 rounded-full flex items-center justify-center font-black shadow-lg text-lg">莊</div><div><div className="text-sm font-black text-slate-200 leading-none mb-1">莊惠呅</div><div className="text-[10px] text-slate-500 font-black tracking-widest leading-none">Administrator</div></div></div></div>
                     </aside>
 
                     {/* 主顯示區 */}
-                    <main className="flex-1 h-full overflow-y-auto p-12 bg-slate-50/50 custom-scrollbar">
+                    <main className="flex-1 h-full overflow-y-auto p-12 bg-slate-50/50 custom-scrollbar relative">
                         {toast && <div className="fixed top-12 right-12 bg-slate-900 text-white px-10 py-5 rounded-[2rem] shadow-2xl z-50 font-black animate-slide-in flex items-center gap-3 border border-white/10"><i className="ph ph-check-circle text-emerald-400 text-xl"></i> {toast}</div>}
 
                         {/* 1. Dashboard */}
@@ -339,18 +333,39 @@
                             </div>
                         )}
 
-                        {/* 2. 商品資料庫 */}
+                        {/* 2. 商品資料庫 (視覺強化版) */}
                         {activeTab === 'products' && (
                             <div className="animate-slide-in space-y-10 max-w-7xl mx-auto pb-20">
                                 <div className="flex justify-between items-end">
-                                    <div><h2 className="text-5xl font-black text-slate-800 italic uppercase tracking-tighter tracking-tighter">商品資料庫</h2><p className="text-[10px] font-black text-slate-400 tracking-[0.4em] mt-1 uppercase">Master Product Hub</p></div>
-                                    <button onClick={()=>{setPForm({id:'', supplier:'', name:'', specs:'', unitPrice:0}); setPEdit('new')}} className="bg-indigo-600 text-white px-10 py-5 rounded-3xl font-black shadow-xl">+ 新增庫存品項</button>
+                                    <div><h2 className="text-5xl font-black text-slate-800 italic uppercase tracking-tighter">商品資料庫</h2><p className="text-[10px] font-black text-slate-400 tracking-[0.4em] mt-1 uppercase">Master Inventory Hub</p></div>
+                                    <button onClick={()=>{setPForm({id:'', supplier:'', name:'', specs:'', unitPrice:0}); setPEdit('new')}} className="bg-indigo-600 text-white px-10 py-5 rounded-3xl font-black shadow-xl hover:scale-105 active:scale-95 transition-all">+ 新增產品項目</button>
                                 </div>
-                                <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100"><input type="text" placeholder="搜尋 SKU 或 品名關鍵字..." value={pSearch} onChange={e=>setPSearch(e.target.value)} className="w-full px-10 py-5 bg-slate-50 border-transparent rounded-[2rem] outline-none font-black text-xl" /></div>
-                                <div className="bg-white rounded-[4rem] border shadow-sm overflow-hidden border-slate-100">
-                                    <table className="w-full text-left table-fixed">
-                                        <thead className="bg-slate-50 border-b font-black text-slate-400 uppercase tracking-widest text-[10px]"><th className="p-10 w-1/4">編號 / 廠牌</th><th className="p-10 w-1/2">品名規格內容</th><th className="p-10 text-right w-1/4">建議售價</th><th className="p-10 text-center w-40">功能</th></thead>
-                                        <tbody>{filteredP.map(p => (<tr key={p.id} className="border-b hover:bg-slate-50 transition-colors group"><td className="p-10 font-mono text-sm text-slate-400">{p.id}<div className="text-indigo-600 font-black mt-2 text-base uppercase">{p.supplier || '一般'}</div></td><td className="p-10 font-black text-slate-800 text-2xl truncate">{p.name}<div className="text-sm font-normal text-slate-400 mt-2 italic">{p.specs}</div></td><td className="p-10 text-right font-mono font-black text-3xl text-emerald-600">${p.unitPrice?.toLocaleString()}</td><td className="p-10 text-center space-x-3"><button onClick={()=>{setPForm(p); setPEdit('edit')}} className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-indigo-50 hover:text-indigo-600 transition-all"><i className="ph ph-pencil-simple text-2xl"></i></button></td></tr>))}</tbody>
+                                <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 shadow-indigo-100/20"><input type="text" placeholder="搜尋 SKU 編號、品名或廠牌..." value={pSearch} onChange={e=>setPSearch(e.target.value)} className="w-full px-10 py-6 bg-slate-50 border-transparent rounded-[2rem] outline-none font-black text-2xl placeholder:text-slate-200" /></div>
+                                <div className="bg-white rounded-[4rem] border border-slate-100 shadow-xl overflow-hidden">
+                                    <table className="w-full text-left table-auto">
+                                        <thead className="bg-slate-50/80 border-b font-black text-slate-400 uppercase tracking-widest text-[11px]"><th className="p-10 w-48">編號 / 廠牌</th><th className="p-10">品名規格內容</th><th className="p-10 text-right w-64">建議單價</th><th className="p-10 text-center w-40">管理</th></thead>
+                                        <tbody>
+                                            {filteredP.map(p => (
+                                                <tr key={p.id} className="border-b hover:bg-indigo-50/30 transition-all group">
+                                                    <td className="p-10 align-top">
+                                                        <div className="inline-block px-3 py-1 bg-slate-100 text-slate-500 rounded-lg font-mono text-xs font-bold mb-2 uppercase">{p.id}</div>
+                                                        <div className="text-indigo-600 font-black text-lg uppercase tracking-tight leading-none">{p.supplier || '一般'}</div>
+                                                    </td>
+                                                    <td className="p-10 align-top">
+                                                        <div className="text-slate-900 font-bold text-xl leading-snug mb-1.5">{p.name}</div>
+                                                        <div className="text-slate-600 font-medium text-base leading-relaxed bg-slate-50 p-3 rounded-2xl border border-slate-100 inline-block min-w-[200px]">{p.specs || '未註明詳細規格'}</div>
+                                                    </td>
+                                                    <td className="p-10 text-right align-top">
+                                                        <div className="font-mono font-black text-4xl text-emerald-700 tracking-tighter">${p.unitPrice?.toLocaleString()}</div>
+                                                        <div className="text-[10px] text-slate-300 font-black uppercase mt-1">Retail Price (TWD)</div>
+                                                    </td>
+                                                    <td className="p-10 text-center align-middle space-x-3">
+                                                        <button onClick={()=>{setPForm(p); setPEdit('edit')}} className="p-5 bg-white border border-slate-100 text-slate-400 rounded-2xl hover:bg-indigo-600 hover:text-white hover:shadow-lg hover:shadow-indigo-200 transition-all"><i className="ph ph-pencil-simple text-2xl"></i></button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {filteredP.length === 0 && <tr><td colSpan="4" className="p-40 text-center text-slate-200 font-black italic text-4xl uppercase tracking-tighter">查無相關商品資料</td></tr>}
+                                        </tbody>
                                     </table>
                                 </div>
                             </div>
@@ -360,32 +375,32 @@
                         {activeTab === 'quotations' && (
                             <div className="animate-slide-in space-y-10 max-w-7xl mx-auto pb-20">
                                 <div className="flex justify-between items-end">
-                                    <h2 className="text-5xl font-black text-slate-800 italic uppercase tracking-tighter">報價單控制台</h2>
-                                    {qView === 'list' && <button onClick={()=>{setQForm({client:'', date:getToday(), items:[], total:0}); setQView('create')}} className="bg-indigo-600 text-white px-10 py-5 rounded-3xl font-black shadow-xl">+ 建立新報價</button>}
+                                    <h2 className="text-5xl font-black text-slate-800 italic uppercase tracking-tighter">報價控制中心</h2>
+                                    {qView === 'list' && <button onClick={()=>{setQForm({client:'', date:getToday(), items:[], total:0}); setQView('create')}} className="bg-indigo-600 text-white px-10 py-5 rounded-3xl font-black shadow-xl">+ 建立新報價單</button>}
                                 </div>
                                 {qView === 'create' ? (
                                     <div className="bg-white p-16 rounded-[5rem] shadow-sm border border-slate-100 space-y-12 max-w-5xl mx-auto">
                                         <div className="grid grid-cols-2 gap-10">
-                                            <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">買受人客戶</label><input type="text" value={qForm.client} onChange={e=>setQForm({...qForm, client:e.target.value})} className="w-full px-8 py-5 rounded-3xl border-4 border-slate-50 font-black text-2xl outline-none" /></div>
-                                            <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">日期</label><input type="date" value={qForm.date} onChange={e=>setQForm({...qForm, date:e.target.value})} className="w-full px-8 py-5 rounded-3xl border-4 border-slate-50 font-bold text-xl outline-none" /></div>
+                                            <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">對象買受人</label><input type="text" value={qForm.client} onChange={e=>setQForm({...qForm, client:e.target.value})} className="w-full px-8 py-5 rounded-3xl border-4 border-slate-50 font-black text-2xl outline-none" /></div>
+                                            <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">單據日期</label><input type="date" value={qForm.date} onChange={e=>setQForm({...qForm, date:e.target.value})} className="w-full px-8 py-5 rounded-3xl border-4 border-slate-50 font-bold text-xl outline-none" /></div>
                                         </div>
                                         <div className="bg-slate-50 p-10 rounded-[4rem] border-4 border-dashed border-slate-200 space-y-6">
                                             <div className="flex gap-6 items-end">
-                                                <div className="flex-1"><label className="text-[10px] font-black text-slate-400 uppercase mb-2 block">選取品項</label><select value={qSelSku} onChange={e=>setQSelSku(e.target.value)} className="w-full px-8 py-5 rounded-3xl border-2 border-white bg-white font-black text-lg outline-none shadow-sm"><option value="">-- 請選取 --</option>{products.map(p => <option key={p.id} value={p.id}>[{p.supplier}] {p.name}</option>)}</select></div>
-                                                <div className="w-32"><label className="text-[10px] font-black text-slate-400 uppercase mb-2 block text-center">數量</label><input type="number" value={qSelQty} onChange={e=>setQSelQty(Number(e.target.value))} className="w-full px-8 py-5 rounded-3xl border-2 border-white text-center font-black text-xl shadow-sm outline-none" /></div>
-                                                <button onClick={handleAddQItem} className="bg-slate-900 text-white px-10 py-5 rounded-3xl font-black shadow-lg">加入明細</button>
+                                                <div className="flex-1"><label className="text-[10px] font-black text-slate-400 uppercase mb-2 block font-black">選取商品 (依廠牌排序)</label><select value={qSelSku} onChange={e=>setQSelSku(e.target.value)} className="w-full px-8 py-5 rounded-3xl border-2 border-white bg-white font-black text-lg outline-none shadow-sm"><option value="">-- 請選取 --</option>{products.map(p => <option key={p.id} value={p.id}>[{p.supplier}] {p.name}</option>)}</select></div>
+                                                <div className="w-32"><label className="text-[10px] font-black text-slate-400 uppercase mb-2 block text-center font-black">數量</label><input type="number" value={qSelQty} onChange={e=>setQSelQty(Number(e.target.value))} className="w-full px-8 py-5 rounded-3xl border-2 border-white text-center font-black text-xl shadow-sm outline-none" /></div>
+                                                <button onClick={handleAddQItem} className="bg-slate-900 text-white px-10 py-5 rounded-3xl font-black shadow-lg">加入</button>
                                             </div>
                                         </div>
-                                        <div className="space-y-4">{qForm.items.map((it, i) => (<div key={i} className="flex justify-between items-center p-6 border-b border-slate-100 font-black"><span className="text-xl">{it.name}<span className="text-slate-400 text-sm ml-4 font-normal">{it.specs}</span></span><span className="text-indigo-600 text-2xl">x{it.qty} / ${(it.qty * it.unitPrice).toLocaleString()}</span></div>))}</div>
+                                        <div className="space-y-4">{qForm.items.map((it, i) => (<div key={i} className="flex justify-between items-center p-8 bg-white border rounded-3xl font-black shadow-sm"><span className="text-xl">{it.name}<span className="text-slate-400 text-sm ml-4 font-normal block mt-1">{it.specs}</span></span><span className="text-indigo-600 text-3xl">x{it.qty} / ${(it.qty * it.unitPrice).toLocaleString()}</span></div>))}</div>
                                         <div className="flex justify-between items-end p-14 bg-slate-900 text-white rounded-[4rem] shadow-2xl relative overflow-hidden">
-                                            <div><div className="text-[10px] opacity-30 uppercase tracking-widest mb-2 font-black">國字大寫預覽</div><div className="text-3xl font-black tracking-[0.2em] text-indigo-300">{numberToChinese(qForm.total)}</div></div>
-                                            <div className="text-right z-10"><div className="text-8xl font-black font-mono text-emerald-400 mb-8">${qForm.total.toLocaleString()}</div><div className="flex gap-4"><button onClick={saveQuote} className="bg-emerald-600 px-10 py-4 rounded-[2rem] font-black">確認儲存</button><button onClick={()=>setQView('list')} className="bg-white/10 px-10 py-4 rounded-[2rem] font-black">返回列表</button></div></div>
+                                            <div><div className="text-[10px] opacity-30 uppercase tracking-widest mb-2 font-black">總計金額大寫預覽</div><div className="text-3xl font-black tracking-[0.2em] text-indigo-300">{numberToChinese(qForm.total)}</div></div>
+                                            <div className="text-right z-10"><div className="text-8xl font-black font-mono text-emerald-400 mb-8">${qForm.total.toLocaleString()}</div><div className="flex gap-4"><button onClick={saveQuote} className="bg-emerald-600 px-10 py-5 rounded-[2.5rem] font-black text-xl shadow-xl">儲存單據</button><button onClick={()=>setQView('list')} className="bg-white/10 px-10 py-5 rounded-[2.5rem] font-black text-xl">返回</button></div></div>
                                         </div>
                                     </div>
                                 ) : (
                                     <div className="bg-white rounded-[4rem] border shadow-sm overflow-hidden border-slate-100">
                                         <table className="w-full text-left table-fixed">
-                                            <thead className="bg-slate-50 border-b font-black text-slate-400 uppercase tracking-widest text-[10px]"><th className="p-10 w-1/4">單號 / 日期</th><th className="p-10 w-1/2">客戶買受人</th><th className="p-10 text-right w-1/4">總金額</th><th className="p-10 text-center w-40">功能</th></thead>
+                                            <thead className="bg-slate-50 border-b font-black text-slate-400 uppercase tracking-widest text-[10px]"><th className="p-10 w-1/4">單號 / 日期</th><th className="p-10 w-1/2">買受人資訊</th><th className="p-10 text-right w-1/4">總計金額</th><th className="p-10 text-center w-40">列印</th></thead>
                                             <tbody>{quotes.map(q => (<tr key={q.id} className="border-b hover:bg-slate-50 transition-colors"><td className="p-10 font-mono text-sm text-slate-400">{q.id}<div className="font-bold text-slate-800 mt-2 text-base">{q.date}</div></td><td className="p-10 font-black text-slate-800 text-2xl truncate">{q.client}</td><td className="p-10 text-right font-black text-indigo-600 text-3xl">${q.total?.toLocaleString()}</td><td className="p-10 text-center"><button onClick={()=>setPrintDoc({type:'quote', data:q})} className="p-5 bg-slate-50 text-indigo-600 rounded-3xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm"><i className="ph ph-printer text-3xl"></i></button></td></tr>))}</tbody>
                                         </table>
                                     </div>
@@ -393,12 +408,12 @@
                             </div>
                         )}
 
-                        {/* 4. 財務與稅務 (核心校正重點) */}
+                        {/* 4. 財務發票 */}
                         {activeTab === 'invoices' && (
                             <div className="animate-slide-in space-y-10 max-w-5xl mx-auto pb-40">
                                 <div className="flex justify-between items-end">
-                                    <div><h2 className="text-5xl font-black text-slate-800 italic uppercase tracking-tighter tracking-tighter">財務中樞</h2><p className="text-[10px] font-black text-slate-400 tracking-[0.4em] mt-1 uppercase">Financial & Tax Control</p></div>
-                                    <div className="flex bg-slate-200 p-2 rounded-3xl gap-2 font-black">
+                                    <h2 className="text-5xl font-black text-slate-800 italic uppercase tracking-tighter">帳務與發票管理</h2>
+                                    <div className="flex bg-slate-200 p-2 rounded-3xl gap-2 font-black shadow-inner">
                                         <button onClick={()=>setInvMode('銷項')} className={`px-8 py-3 rounded-2xl transition-all ${invMode==='銷項'?'bg-white text-indigo-600 shadow-md':'text-slate-500'}`}>銷項紀錄</button>
                                         <button onClick={()=>setInvMode('進項')} className={`px-8 py-3 rounded-2xl transition-all ${invMode==='進項'?'bg-white text-red-600 shadow-md':'text-slate-500'}`}>進項支出</button>
                                     </div>
@@ -408,55 +423,54 @@
                                         <div className="space-y-2">
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">發票類型</label>
                                             <select value={invForm.category} onChange={e=>setInvForm({...invForm, category:e.target.value})} className="w-full px-8 py-5 rounded-3xl border-4 border-slate-50 bg-slate-50 font-black text-xl outline-none focus:bg-white shadow-inner">
-                                                <option>三聯式</option><option>二聯式</option><option>電子領據/其他</option>
+                                                <option>三聯式</option><option>二聯式</option><option>電子/免用發票</option>
                                             </select>
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">發票號碼 (格式: AA-12345678)</label>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">發票號碼 (範例: AB-12345678)</label>
                                             <input type="text" placeholder="大寫英文-8位數字" value={invForm.invNum} onChange={e=>setInvForm({...invForm, invNum:e.target.value.toUpperCase()})} className="w-full px-8 py-5 rounded-3xl border-4 border-slate-50 font-mono text-3xl font-black bg-slate-50 focus:bg-white transition-all shadow-inner" />
                                         </div>
-                                        {/* 三聯式才顯示統編欄位 */}
                                         {invForm.category === '三聯式' && (
                                             <div className="space-y-2 col-span-full animate-slide-in">
-                                                <label className="text-[10px] font-black text-red-500 uppercase tracking-widest">統一編號 (必填 8 碼)</label>
-                                                <input type="text" maxLength={8} value={invForm.taxId} onChange={e=>setInvForm({...invForm, taxId:e.target.value.replace(/\D/g,'')})} className="w-full px-8 py-5 rounded-3xl border-4 border-red-50 font-mono text-4xl tracking-[0.5em] font-black bg-red-50/30 focus:bg-white outline-none transition-all" />
+                                                <label className="text-[10px] font-black text-red-500 uppercase tracking-widest">統一編號 (必填 8 碼校驗)</label>
+                                                <input type="text" maxLength={8} value={invForm.taxId} onChange={e=>setInvForm({...invForm, taxId:e.target.value.replace(/\D/g,'')})} className="w-full px-8 py-5 rounded-3xl border-4 border-red-50 font-mono text-4xl tracking-[0.5em] font-black bg-red-50/10 focus:bg-white outline-none transition-all shadow-inner" />
                                             </div>
                                         )}
                                         <div className="space-y-2 col-span-full">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{invMode==='銷項'?'客戶買受人':'開立供應商'}</label>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{invMode==='銷項'?'客戶買受人抬頭':'開立之供應商名稱'}</label>
                                             <input type="text" value={invForm.client} onChange={e=>setInvForm({...invForm, client:e.target.value})} className="w-full px-8 py-5 rounded-3xl border-4 border-slate-50 font-black text-2xl outline-none shadow-inner" />
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">未稅銷售額</label>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">銷售額 (未稅金額)</label>
                                             <input type="number" value={invForm.netAmount} onChange={e=>updateInvAmount(e.target.value, 'net')} className="w-full px-8 py-5 rounded-3xl border-4 border-slate-50 font-mono text-3xl font-black bg-slate-50 focus:bg-white" />
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">含稅總計</label>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">總計額 (含稅金額)</label>
                                             <input type="number" value={invForm.totalAmount} onChange={e=>updateInvAmount(e.target.value, 'total')} className={`w-full px-8 py-5 rounded-3xl border-4 font-mono text-3xl font-black bg-white shadow-inner ${invMode==='銷項'?'border-emerald-100 text-emerald-600':'border-red-100 text-red-600'}`} />
                                         </div>
                                     </div>
                                     <div className="bg-slate-900 text-white p-14 rounded-[4rem] flex justify-between items-center shadow-2xl relative overflow-hidden group">
                                         <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full -mr-40 -mt-40 blur-3xl group-hover:bg-indigo-500/20 transition-all"></div>
-                                        <div><div className="text-[10px] opacity-30 uppercase tracking-widest mb-2 font-black tracking-widest">大寫金額核準</div><div className="text-3xl font-black tracking-[0.2em] text-indigo-300">{numberToChinese(invForm.totalAmount)}</div></div>
-                                        <div className="text-right z-10"><div className="text-[10px] opacity-30 mb-2 uppercase font-black tracking-widest">營業稅(5%): ${invForm.taxAmount.toLocaleString()}</div><div className={`text-8xl font-black font-mono tracking-tighter ${invMode==='銷項'?'text-emerald-400':'text-red-400'}`}>${invForm.totalAmount.toLocaleString()}</div></div>
+                                        <div><div className="text-[10px] opacity-30 uppercase tracking-widest mb-2 font-black tracking-widest">國字大寫轉譯校對</div><div className="text-3xl font-black tracking-[0.2em] text-indigo-300">{numberToChinese(invForm.totalAmount)}</div></div>
+                                        <div className="text-right z-10"><div className="text-[10px] opacity-30 mb-2 uppercase font-black tracking-widest text-white/50">營業稅額(5%): ${invForm.taxAmount.toLocaleString()}</div><div className={`text-8xl font-black font-mono tracking-tighter ${invMode==='銷項'?'text-emerald-400':'text-red-400'}`}>${invForm.totalAmount.toLocaleString()}</div></div>
                                     </div>
-                                    <button onClick={handleCreateInvoice} className={`w-full py-10 rounded-[3rem] font-black text-4xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-4 ${invMode==='銷項'?'bg-indigo-600 text-white shadow-indigo-200':'bg-red-600 text-white shadow-red-200'}`}><i className="ph ph-receipt text-5xl"></i> 簽發 {invMode}發票紀錄</button>
+                                    <button onClick={handleCreateInvoice} className={`w-full py-10 rounded-[3rem] font-black text-4xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-4 ${invMode==='銷項'?'bg-indigo-600 text-white shadow-indigo-200':'bg-red-600 text-white shadow-red-200'}`}><i className="ph ph-receipt text-5xl"></i> 簽發 {invMode}發票存檔</button>
                                 </div>
                                 <div className="bg-white rounded-[4rem] border shadow-sm overflow-hidden border-slate-100">
-                                    <h4 className="p-10 font-black text-slate-400 uppercase tracking-widest border-b bg-slate-50 text-xs">歷史紀錄 ({invMode})</h4>
+                                    <h4 className="p-10 font-black text-slate-400 uppercase tracking-widest border-b bg-slate-50 text-xs">歷史紀錄清單 ({invMode})</h4>
                                     <table className="w-full text-left table-fixed">
-                                        <thead className="bg-slate-50 border-b font-black text-slate-400 uppercase tracking-widest text-[10px]"><th className="p-10 w-1/4">日期 / 統編</th><th className="p-10 w-1/2">對象資訊 / 號碼</th><th className="p-10 text-right w-1/4">帳項總額</th></thead>
-                                        <tbody>{(invMode==='銷項'?invoices:inputInvoices).map(i => (<tr key={i.id} className="border-b hover:bg-slate-50 transition-colors"><td className="p-10 font-mono text-sm text-slate-400">{i.date}<div className="font-bold text-indigo-600 mt-2 text-base uppercase">{i.taxId || i.category}</div></td><td className="p-10 font-black text-slate-800 text-2xl truncate">{i.client}<div className="text-xs text-slate-400 font-mono mt-1 italic">{i.invNum || '無號碼'}</div></td><td className="p-10 text-right font-black text-slate-800 text-3xl">${i.totalAmount?.toLocaleString()}</td></tr>))}</tbody>
+                                        <thead className="bg-slate-50 border-b font-black text-slate-400 uppercase tracking-widest text-[10px]"><th className="p-10 w-1/4">日期 / 統編</th><th className="p-10 w-1/2">對象名稱 / 發票號碼</th><th className="p-10 text-right w-1/4">帳項總額</th></thead>
+                                        <tbody>{(invMode==='銷項'?invoices:inputInvoices).map(i => (<tr key={i.id} className="border-b hover:bg-slate-50 transition-colors"><td className="p-10 font-mono text-sm text-slate-400">{i.date}<div className="font-bold text-indigo-600 mt-2 text-base uppercase">{i.taxId || i.category}</div></td><td className="p-10 font-black text-slate-800 text-2xl truncate">{i.client}<div className="text-xs text-slate-400 font-mono mt-1 italic tracking-widest uppercase">{i.invNum || '無號碼紀錄'}</div></td><td className="p-10 text-right font-black text-slate-800 text-3xl">${i.totalAmount?.toLocaleString()}</td></tr>))}</tbody>
                                     </table>
                                 </div>
                             </div>
                         )}
 
-                        {/* 5. 採購與物流 (邏輯保留，介面簡潔) */}
+                        {/* 5. 採購訂購單 */}
                         {activeTab === 'orders' && (
                             <div className="animate-slide-in space-y-10 max-w-7xl mx-auto pb-20">
                                 <div className="flex justify-between items-end">
-                                    <div><h2 className="text-5xl font-black text-slate-800 italic uppercase tracking-tighter">採購管理</h2><p className="text-[10px] font-black text-slate-400 tracking-[0.4em] mt-1 uppercase">Supplier Order Control</p></div>
+                                    <h2 className="text-5xl font-black text-slate-800 italic uppercase tracking-tighter">供應商採購中心</h2>
                                     {oView === 'list' && <button onClick={()=>{setOForm({supplier:'', client:'', date:getToday(), items:[]}); setOView('create')}} className="bg-indigo-600 text-white px-10 py-5 rounded-3xl font-black shadow-xl">+ 建立採購訂製單</button>}
                                 </div>
                                 {oView === 'create' ? (
@@ -466,17 +480,17 @@
                                             <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">對應客戶</label><input type="text" value={oForm.client} onChange={e=>setOForm({...oForm, client:e.target.value})} className="w-full px-8 py-5 rounded-3xl border-4 border-slate-50 font-black text-2xl outline-none" /></div>
                                         </div>
                                         <div className="bg-slate-50 p-10 rounded-[4rem] border-4 border-dashed border-slate-200 flex gap-6 items-end">
-                                            <div className="flex-1"><select value={oSelSku} onChange={e=>setOSelSku(e.target.value)} className="w-full px-8 py-5 rounded-3xl border-2 border-white bg-white font-black text-lg outline-none shadow-sm"><option value="">-- 選取產品 --</option>{products.map(p => <option key={p.id} value={p.id}>[{p.supplier}] {p.name}</option>)}</select></div>
+                                            <div className="flex-1"><select value={oSelSku} onChange={e=>setOSelSku(e.target.value)} className="w-full px-8 py-5 rounded-3xl border-2 border-white bg-white font-black text-lg outline-none shadow-sm"><option value="">-- 選取產品項目 --</option>{products.map(p => <option key={p.id} value={p.id}>[{p.supplier}] {p.name}</option>)}</select></div>
                                             <button onClick={handleAddOrderItem} className="bg-slate-900 text-white px-10 py-5 rounded-3xl font-black shadow-lg">加入</button>
                                         </div>
-                                        <div className="space-y-4">{oForm.items.map((it, i) => (<div key={i} className="flex justify-between items-center p-6 border-b border-slate-100 font-black text-xl"><span>{it.name}</span><span>x{it.qty}</span></div>))}</div>
-                                        <div className="flex justify-end gap-6"><button onClick={saveOrder} className="bg-indigo-600 text-white px-16 py-6 rounded-[2.5rem] font-black text-2xl shadow-xl">確認簽發</button><button onClick={()=>setOView('list')} className="px-10 py-6 bg-slate-100 text-slate-400 rounded-[2.5rem] font-black">取消</button></div>
+                                        <div className="space-y-4">{oForm.items.map((it, i) => (<div key={i} className="flex justify-between items-center p-8 bg-white border rounded-3xl font-black text-2xl"><span>{it.name}</span><span>x{it.qty}</span></div>))}</div>
+                                        <div className="flex justify-end gap-6"><button onClick={saveOrder} className="bg-indigo-600 text-white px-16 py-6 rounded-[2.5rem] font-black text-2xl shadow-xl">簽發訂單</button><button onClick={()=>setOView('list')} className="px-10 py-6 bg-slate-100 text-slate-400 rounded-[2.5rem] font-black text-xl">取消</button></div>
                                     </div>
                                 ) : (
                                     <div className="bg-white rounded-[4rem] border shadow-sm overflow-hidden">
                                         <table className="w-full text-left table-fixed">
-                                            <thead className="bg-slate-50 border-b font-black text-slate-400 uppercase tracking-widest text-[10px]"><th className="p-10 w-1/4">編號 / 日期</th><th className="p-10 w-48 text-center">廠牌</th><th className="p-10 w-1/2">客戶來源</th><th className="p-10 text-center w-40">列印</th></thead>
-                                            <tbody>{orders.map(o => (<tr key={o.id} className="border-b hover:bg-slate-50 transition-colors group"><td className="p-10 font-mono text-sm text-slate-400">{o.id}<div className="font-bold text-slate-800 mt-2 text-base">{o.date}</div></td><td className="p-10 text-center"><span className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-2xl font-black text-sm uppercase">{o.supplier}</span></td><td className="p-10 font-black text-slate-800 text-2xl truncate">{o.client}</td><td className="p-10 text-center"><button onClick={()=>setPrintDoc({type:'order', data:o})} className="p-5 bg-slate-50 text-amber-600 rounded-3xl hover:bg-amber-500 hover:text-white transition-all shadow-sm"><i className="ph ph-printer text-3xl"></i></button></td></tr>))}</tbody>
+                                            <thead className="bg-slate-50 border-b font-black text-slate-400 uppercase tracking-widest text-[10px]"><th className="p-10 w-1/4">編號 / 日期</th><th className="p-10 w-48 text-center">供應廠牌</th><th className="p-10 w-1/2">客戶來源</th><th className="p-10 text-center w-40">功能</th></thead>
+                                            <tbody>{orders.map(o => (<tr key={o.id} className="border-b hover:bg-slate-50 transition-colors group"><td className="p-10 font-mono text-sm text-slate-400">{o.id}<div className="font-bold text-slate-800 mt-2 text-base">{o.date}</div></td><td className="p-10 text-center"><span className="px-5 py-2 bg-indigo-50 text-indigo-600 rounded-2xl font-black text-sm uppercase">{o.supplier}</span></td><td className="p-10 font-black text-slate-800 text-2xl truncate">{o.client}</td><td className="p-10 text-center"><button onClick={()=>setPrintDoc({type:'order', data:o})} className="p-5 bg-slate-50 text-amber-600 rounded-3xl hover:bg-amber-500 hover:text-white transition-all shadow-sm"><i className="ph ph-printer text-3xl"></i></button></td></tr>))}</tbody>
                                         </table>
                                     </div>
                                 )}
@@ -484,7 +498,7 @@
                         )}
 
                         {activeTab === 'logistics' && (
-                            <div className="p-20 text-center text-slate-300 font-black text-4xl italic uppercase animate-slide-in">物流調度系統運作中 <br/><span className="text-sm font-bold tracking-widest opacity-50 uppercase tracking-widest mt-4 block underline">Logistics Logic Syncing...</span></div>
+                            <div className="p-20 text-center text-slate-300 font-black text-4xl italic uppercase animate-slide-in">物流任務看板運作中... <br/><span className="text-sm font-bold tracking-widest opacity-40 uppercase block mt-4 underline">Logistics System Online</span></div>
                         )}
                     </main>
 
@@ -494,10 +508,10 @@
                             <div className="bg-white p-12 rounded-[4rem] w-full max-w-lg shadow-2xl animate-slide-in">
                                 <h3 className="text-3xl font-black mb-10 text-indigo-600 italic uppercase">編輯商品參數</h3>
                                 <div className="space-y-6 mb-10">
-                                    <div className="grid grid-cols-2 gap-4"><div className="space-y-1"><label className="text-[10px] font-black opacity-30 uppercase">SKU</label><input type="text" value={pForm.id} onChange={e=>setPForm({...pForm, id:e.target.value})} className="w-full px-6 py-4 rounded-2xl border-2 font-mono" /></div><div className="space-y-1"><label className="text-[10px] font-black opacity-30 uppercase">供應廠牌</label><input type="text" value={pForm.supplier} onChange={e=>setPForm({...pForm, supplier:e.target.value})} className="w-full px-8 py-4 rounded-2xl border-2 font-black" /></div></div>
-                                    <div className="space-y-1"><label className="text-[10px] font-black opacity-30 uppercase">品名</label><input type="text" value={pForm.name} onChange={e=>setPForm({...pForm, name:e.target.value})} className="w-full px-6 py-4 rounded-2xl border-2 font-black text-xl" /></div>
-                                    <div className="space-y-1"><label className="text-[10px] font-black opacity-30 uppercase">規格</label><input type="text" value={pForm.specs} onChange={e=>setPForm({...pForm, specs:e.target.value})} className="w-full px-6 py-4 rounded-2xl border-2" /></div>
-                                    <div className="space-y-1"><label className="text-[10px] font-black opacity-30 uppercase">單價</label><input type="number" value={pForm.unitPrice} onChange={e=>setPForm({...pForm, unitPrice:Number(e.target.value)})} className="w-full px-6 py-4 rounded-2xl border-2 text-right font-black text-3xl text-emerald-600" /></div>
+                                    <div className="grid grid-cols-2 gap-4"><div className="space-y-1"><label className="text-[10px] font-black opacity-30 uppercase">系統 SKU 編號</label><input type="text" value={pForm.id} onChange={e=>setPForm({...pForm, id:e.target.value})} className="w-full px-6 py-4 rounded-2xl border-2 font-mono" /></div><div className="space-y-1"><label className="text-[10px] font-black opacity-30 uppercase">供應廠牌名稱</label><input type="text" value={pForm.supplier} onChange={e=>setPForm({...pForm, supplier:e.target.value})} className="w-full px-8 py-4 rounded-2xl border-2 font-black" /></div></div>
+                                    <div className="space-y-1"><label className="text-[10px] font-black opacity-30 uppercase">主要品名名稱</label><input type="text" value={pForm.name} onChange={e=>setPForm({...pForm, name:e.target.value})} className="w-full px-6 py-4 rounded-2xl border-2 font-black text-xl" /></div>
+                                    <div className="space-y-1"><label className="text-[10px] font-black opacity-30 uppercase">詳細參數規格</label><textarea rows="3" value={pForm.specs} onChange={e=>setPForm({...pForm, specs:e.target.value})} className="w-full px-6 py-4 rounded-2xl border-2 font-medium" /></div>
+                                    <div className="space-y-1"><label className="text-[10px] font-black opacity-30 uppercase">建議單價 (TWD)</label><input type="number" value={pForm.unitPrice} onChange={e=>setPForm({...pForm, unitPrice:Number(e.target.value)})} className="w-full px-6 py-4 rounded-2xl border-2 text-right font-black text-4xl text-emerald-600" /></div>
                                 </div>
                                 <div className="flex gap-4"><button onClick={handlePSave} className="flex-1 bg-indigo-600 text-white py-6 rounded-3xl font-black text-xl shadow-xl">確認儲存</button><button onClick={()=>setPEdit(null)} className="px-10 py-6 bg-slate-100 text-slate-400 rounded-3xl font-black">取消</button></div>
                             </div>
