@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>申堡營運中樞系統 - 旗艦整合版 v4.4</title>
+    <title>申堡營運中樞系統 - 旗艦整合版 v4.5</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -29,7 +29,7 @@
             .no-print { display: none !important; }
             .print-only { display: block !important; }
             .print-container { 
-                width: 210mm; /* A4 Standard Width */
+                width: 210mm; 
                 max-width: 100%; 
                 padding: 0 !important; 
                 margin: 0 auto !important; 
@@ -48,7 +48,6 @@
             .page-break { page-break-after: always; }
             @page { margin: 15mm; size: A4 portrait; }
         }
-        .print-only { display: none; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
@@ -111,7 +110,6 @@
             const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
             const handlePrint = (type, data) => { setPrintDoc({ type, data }); setTimeout(() => window.print(), 300); };
 
-            // --- 數據備份與還原工具 ---
             const exportData = (data, fileName) => {
                 const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -132,77 +130,62 @@
                         if (Array.isArray(json)) {
                             setter(json);
                             showToast(`${name} 數據還原成功`);
-                        } else {
-                            showToast("無效的檔案格式，請確認備份檔正確性");
-                        }
-                    } catch (err) {
-                        showToast("檔案讀取出錯");
-                    }
+                        } else { showToast("無效的檔案格式"); }
+                    } catch (err) { showToast("讀取失敗"); }
                 };
                 reader.readAsText(file);
-                event.target.value = ''; // Reset input
+                event.target.value = '';
             };
 
-            // --- 其他狀態 ---
+            // --- 其他 UI 狀態 ---
             const [productView, setProductView] = useState('list');
-            const [editingProductId, setEditingProductId] = useState(null);
             const [newProductData, setNewProductData] = useState({ id: '', supplier: '', name: '', specs: '', unitPrice: 0 });
-            const [isIdLocked, setIsIdLocked] = useState(true);
-
+            
             const [quoteView, setQuoteView] = useState('list');
             const [editingQuoteId, setEditingQuoteId] = useState(null);
             const [newQuoteData, setNewQuoteData] = useState({ client: '', contacts: [{ name: '', phone: '' }], date: getToday(), items: [] });
-            const [quoteSearch, setQuoteSearch] = useState('');
-            const [customSpec, setCustomSpec] = useState('');
-            const [customPrice, setCustomPrice] = useState('');
-            const [qty, setQty] = useState(1);
-            const [showDropdown, setShowDropdown] = useState(false);
-
+            
             const [invoiceView, setInvoiceView] = useState('list');
             const [editingInvoiceId, setEditingInvoiceId] = useState(null);
-            const [newInvoiceData, setNewInvoiceData] = useState({ invNo: '', type: '三聯式', transactionType: '銷項', taxType: 'taxable', date: getToday(), client: '', taxId: '', items: [], netAmount: 0, tax: 0, total: 0, status: '未付款' });
+            const [newInvoiceData, setNewInvoiceData] = useState({ 
+                invNo: '', type: '三聯式', transactionType: '銷項', taxType: 'taxable', date: getToday(), client: '', taxId: '', items: [], netAmount: 0, tax: 0, total: 0, status: '未付款' 
+            });
 
             const [logisticsView, setLogisticsView] = useState('list');
             const [tempLogisticsData, setTempLogisticsData] = useState({ id: '', client: '', refPo: '', items: [], status: '待進貨' });
 
             // ==========================================
-            // 報表列印引擎 (防裁切強化)
+            // 報表列印引擎
             // ==========================================
             if (printDoc) {
                 const closePrint = () => setPrintDoc(null);
-                
-                if (printDoc.type === 'quote') {
+                if (printDoc.type === 'quote' || printDoc.type === 'order') {
                     const q = printDoc.data;
-                    const qTotal = (q.amount || 0);
-                    const totalRows = 12;
-                    const itemsCount = q.items?.length || 0;
-                    const emptyRows = Math.max(0, totalRows - itemsCount);
-
+                    const isOrder = printDoc.type === 'order';
                     return (
                         <div className="bg-white text-black min-h-screen p-10 font-serif print-container">
                             <div className="no-print mb-8 p-4 bg-indigo-50 rounded-xl flex justify-between items-center border border-indigo-200">
-                                <span className="font-bold text-indigo-800 tracking-tighter">估價單預覽：表格已鎖定寬度以防止裁切</span>
-                                <div className="flex gap-4"><button onClick={()=>window.print()} className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold shadow">列印</button><button onClick={closePrint} className="bg-slate-200 px-6 py-2 rounded-lg font-bold">返回</button></div>
+                                <span className="font-bold text-indigo-800 tracking-tighter">{isOrder?'訂貨單':'估價單'}預覽：表格已鎖定寬度以防止裁切</span>
+                                <div className="flex gap-4"><button onClick={()=>window.print()} className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold">列印</button><button onClick={closePrint} className="bg-slate-200 px-6 py-2 rounded-lg font-bold">返回</button></div>
                             </div>
-                            <h1 className="text-center text-4xl font-bold tracking-[1em] mb-10 ml-4 uppercase">估價單</h1>
+                            <h1 className="text-center text-4xl font-bold tracking-[1em] mb-10 ml-4 uppercase">{isOrder?'訂貨單':'估價單'}</h1>
                             <div className="flex justify-between items-end mb-4 text-lg border-b border-black pb-2">
                                 <div className="font-bold min-w-[280px] break-words">{q.client} 台照</div>
                                 <div className="text-right space-y-1">
-                                    {(q.contacts || []).map((c, i) => (
-                                        <div key={i} className="text-sm font-sans tracking-tight">電話：{c.phone} <span className="ml-2 font-serif text-base">{c.name}</span></div>
+                                    {isOrder ? (<div>供應商：{q.supplier}</div>) : (q.contacts || []).map((c, i) => (
+                                        <div key={i} className="text-sm font-sans">電話：{c.phone} <span className="ml-2 font-serif text-base">{c.name}</span></div>
                                     ))}
                                 </div>
                             </div>
-                            <div className="mb-4 text-lg font-bold">中華民國 <span className="mx-2 font-sans">{toTaiwanYear(q.date)}</span></div>
+                            <div className="mb-4 text-lg font-bold font-sans tracking-widest uppercase">日期：{toTaiwanYear(q.date)} &nbsp;&nbsp;&nbsp; 編號：{q.id}</div>
                             <table className="w-full border-collapse border border-black text-center text-lg mb-4 table-fixed">
                                 <thead className="bg-slate-100">
                                     <tr>
-                                        <th className="border border-black p-3 w-[35%]">品名描述</th>
+                                        <th className="border border-black p-3 w-[40%]">品名描述</th>
                                         <th className="border border-black p-3 w-[25%]">規格內容</th>
-                                        <th className="border border-black p-3 w-[8%]">數量</th>
+                                        <th className="border border-black p-3 w-[10%]">數量</th>
                                         <th className="border border-black p-3 w-[12%]">單價</th>
-                                        <th className="border border-black p-3 w-[15%]">金額</th>
-                                        <th className="border border-black p-3 w-[5%]">序</th>
+                                        <th className="border border-black p-3 w-[13%]">金額</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -212,70 +195,140 @@
                                             <td className="border border-black p-3 text-left text-sm break-words">{item.specs}</td>
                                             <td className="border border-black p-3">{item.qty}</td>
                                             <td className="border border-black p-3 font-mono">{(item.unitPrice || 0).toLocaleString()}</td>
-                                            <td className="border border-black p-3 font-mono">{(item.qty * item.unitPrice).toLocaleString()}</td>
-                                            <td className="border border-black p-3 text-[10px] text-slate-400">{idx+1}</td>
+                                            <td className="border border-black p-3 font-mono">{(item.qty * (item.unitPrice || 0)).toLocaleString()}</td>
                                         </tr>
                                     ))}
-                                    {[...Array(emptyRows)].map((_, i) => (
-                                        <tr key={`empty-${i}`}><td className="border border-black p-5 text-left">{i === 0 && itemsCount < totalRows ? '以下空白' : ''}</td><td className="border border-black p-5"></td><td className="border border-black p-5"></td><td className="border border-black p-5"></td><td className="border border-black p-5"></td><td className="border border-black p-5"></td></tr>
+                                    {[...Array(Math.max(0, 10 - (q.items?.length||0)))].map((_, i) => (
+                                        <tr key={`e-${i}`}><td className="border border-black p-5"></td><td className="border border-black p-5"></td><td className="border border-black p-5"></td><td className="border border-black p-5"></td><td className="border border-black p-5"></td></tr>
                                     ))}
-                                    <tr className="bg-slate-50 font-bold"><td colSpan="4" className="border border-black p-3 text-left tracking-widest uppercase">總額新台幣 &nbsp;&nbsp; {numberToChinese(qTotal).split('').join(' ')}</td><td colSpan="2" className="border border-black p-3 text-left font-mono text-xl">NT$ {qTotal.toLocaleString()}</td></tr>
+                                    {!isOrder && (
+                                        <tr className="bg-slate-50 font-bold"><td colSpan="3" className="border border-black p-3 text-left uppercase">總額新台幣 &nbsp;&nbsp; {numberToChinese(q.amount).split('').join(' ')}</td><td colSpan="2" className="border border-black p-3 text-left font-mono text-xl">NT$ {(q.amount||0).toLocaleString()}</td></tr>
+                                    )}
                                 </tbody>
                             </table>
                             <div className="mt-8 flex justify-end pr-12 relative"><div className="text-center font-bold text-sm mr-4 mt-12">申堡辦公家具行<br/>負責人簽章</div><img src="./因張good.png" className="w-48 h-auto" style={{ mixBlendMode: 'multiply' }} /></div>
                         </div>
                     );
-                } else if (printDoc.type === 'order') {
-                    const o = printDoc.data;
+                } else if (printDoc.type === 'delivery') {
+                    const t = printDoc.data;
+                    const labels = [{ t: "第一聯：會計聯", c: "border-slate-300" }, { t: "第二聯：客戶聯", c: "border-amber-400" }, { t: "第三聯：存查聯", c: "border-blue-400" }, { t: "第四聯：回單聯", c: "border-red-400" }];
                     return (
-                        <div className="bg-white text-black min-h-screen p-10 font-sans print-container">
-                            <div className="no-print mb-8 p-4 bg-amber-50 rounded-xl flex justify-between items-center border border-amber-200">
-                                <span className="font-bold text-amber-800 tracking-tighter">訂貨單預覽：已優化防止裁切</span>
-                                <div className="flex gap-4"><button onClick={()=>window.print()} className="bg-amber-600 text-white px-6 py-2 rounded-lg font-bold shadow">列印</button><button onClick={closePrint} className="bg-slate-200 px-6 py-2 rounded-lg font-bold">返回</button></div>
+                        <div className="bg-white text-black font-sans print-container p-2">
+                            <div className="no-print p-6 bg-emerald-50 mb-4 flex justify-between items-center">
+                                <span className="font-bold text-emerald-800">一式四聯單列印模式</span>
+                                <button onClick={()=>window.print()} className="bg-emerald-600 text-white px-6 py-2 rounded-lg">列印</button>
                             </div>
-                            <div className="flex justify-between items-start mb-6 border-b-2 border-black pb-6">
-                                <div className="space-y-1"><h2 className="text-2xl font-black">{companyInfo.name}</h2><p>統編: {companyInfo.taxId}</p><p>店址: {companyInfo.address}</p><p>電話: {companyInfo.phone}</p></div>
-                                <div className="text-right"><h1 className="text-4xl font-black tracking-widest mb-6 uppercase">訂貨明細單</h1><p>訂單編號: {o.id}</p><p>日期: {toTaiwanYear(o.date)}</p></div>
-                            </div>
-                            <div className="bg-slate-100 p-4 border border-black mb-6 font-bold text-lg">採購對象：{o.supplier}</div>
-                            <table className="w-full border-collapse border border-black text-center text-lg table-fixed">
-                                <thead className="bg-slate-200"><tr><th className="border border-black p-3 w-[10%]">序</th><th className="border border-black p-3 w-[40%]">品名</th><th className="border border-black p-3 w-[30%]">規格</th><th className="border border-black p-3 w-[10%]">數量</th><th className="border border-black p-3 w-[10%]">備註</th></tr></thead>
-                                <tbody>
-                                    {(o.items || []).map((item, idx) => (
-                                        <tr key={idx}><td className="border border-black p-4 font-mono">{idx+1}</td><td className="border border-black p-4 text-left font-bold break-words">{item.name}</td><td className="border border-black p-4 text-sm break-words">{item.specs}</td><td className="border border-black p-4 font-bold">{item.qty}</td><td className="border border-black p-4 text-xs">{o.customRemark ? '★' : ''}</td></tr>
-                                    ))}
-                                    {[...Array(5)].map((_, i) => (<tr key={i}><td className="border border-black p-6" colSpan="5"></td></tr>))}
-                                </tbody>
-                            </table>
-                            <div className="mt-16 flex justify-end pr-12 relative">負責人簽章：<img src="./因張good.png" className="w-48 h-auto" style={{ mixBlendMode: 'multiply' }} /></div>
+                            {labels.map((l, idx) => (
+                                <div key={idx} className={`border-2 ${l.c} p-4 rounded-xl mb-4 relative overflow-hidden`} style={{ pageBreakInside: 'avoid' }}>
+                                    <div className="flex justify-between items-start mb-2 border-b border-black pb-2">
+                                        <div><h2 className="text-lg font-black">{companyInfo.name} - 送貨單</h2><p className="text-[10px]">{companyInfo.address}</p></div>
+                                        <div className="text-right font-black text-sm">{l.t}</div>
+                                    </div>
+                                    <div className="flex justify-between text-xs mb-2"><span>客戶：{t.client}</span><span>單號：{t.id}</span></div>
+                                    <table className="w-full border border-black text-[10px] text-center table-fixed">
+                                        <thead><tr className="bg-slate-100"><th className="border border-black w-8">序</th><th className="border border-black">品名規格</th><th className="border border-black w-12">數量</th><th className="border border-black w-16">備註</th></tr></thead>
+                                        <tbody>{t.items.map((it, i) => (<tr key={i}><td className="border border-black">{i+1}</td><td className="border border-black text-left px-1">{it.name} {it.specs}</td><td className="border border-black font-bold">{it.qty}</td><td className="border border-black"></td></tr>))}</tbody>
+                                    </table>
+                                    <div className="mt-2 flex justify-end gap-10 text-[10px] pt-2 border-t border-dotted border-black"><span>送貨員簽章：__________</span><span>客戶簽章：__________</span></div>
+                                </div>
+                            ))}
                         </div>
                     );
                 }
             }
 
             // ==========================================
-            // ⭐️ 商品主檔管理 (支援匯出匯入)
+            // ⭐️ 智慧發票系統 (強化版 - 包含統編欄位)
             // ==========================================
-            const renderProductView = () => {
-                if (productView === 'create') {
+            const handleInvoiceInputChange = (e) => {
+                const { name, value } = e.target;
+                let val = value;
+                if (name === 'taxId') val = value.replace(/[^0-9]/g, '').substring(0, 8);
+                if (name === 'invNo') val = value.toUpperCase().replace(/[^A-Z0-9\-]/g, '');
+                
+                const next = { ...newInvoiceData, [name]: val };
+                if (name === 'taxType' || name === 'items') {
+                    const net = (next.items || []).reduce((s, it) => s + (it.amount || 0), 0);
+                    const tax = next.taxType === 'taxable' ? Math.round(net * 0.05) : 0;
+                    setNewInvoiceData({ ...next, netAmount: net, tax, total: net + tax });
+                } else setNewInvoiceData(next);
+            };
+
+            const renderInvoiceView = () => {
+                if (invoiceView === 'create') {
                     return (
-                        <div className="max-w-3xl mx-auto bg-white p-10 rounded-[3rem] shadow-sm border border-slate-200 animate-slide-in">
-                            <h2 className="text-2xl font-black mb-8">{editingProductId ? '修改商品資料' : '全新商品建檔'}</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div className="md:col-span-1"><label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest">商品 ID</label><div className="flex gap-2"><input type="text" value={newProductData.id} onChange={(e)=>setNewProductData({...newProductData, id: e.target.value})} className={`flex-1 px-4 py-3 border rounded-xl font-mono ${isIdLocked ? 'bg-slate-50' : 'bg-white'}`} disabled={isIdLocked}/><button onClick={()=>setIsIdLocked(!isIdLocked)} className="px-3 bg-slate-100 rounded-xl text-xs font-bold">{isIdLocked ? '解鎖' : '手動'}</button></div></div>
-                                <div className="md:col-span-1"><label className="block text-[10px] font-black text-slate-400 mb-2 uppercase">品牌供應商</label><input type="text" value={newProductData.supplier} onChange={(e)=>setNewProductData({...newProductData, supplier: e.target.value})} className="w-full px-4 py-3 border rounded-xl" /></div>
-                                <div className="md:col-span-2"><label className="block text-[10px] font-black text-slate-400 mb-2 uppercase">品名</label><input type="text" value={newProductData.name} onChange={(e)=>setNewProductData({...newProductData, name: e.target.value})} className="w-full px-4 py-3 border rounded-xl font-black text-lg" /></div>
-                                <div><label className="block text-[10px] font-black text-slate-400 mb-2 uppercase">規格說明</label><input type="text" value={newProductData.specs} onChange={(e)=>setNewProductData({...newProductData, specs: e.target.value})} className="w-full px-4 py-3 border rounded-xl" /></div>
-                                <div><label className="block text-[10px] font-black text-slate-400 mb-2 uppercase">單價 (未稅預設)</label><input type="number" value={newProductData.unitPrice} onChange={(e)=>setNewProductData({...newProductData, unitPrice: e.target.value})} className="w-full px-4 py-3 border rounded-xl font-mono text-right" /></div>
+                        <div className="p-8 animate-slide-in max-w-5xl mx-auto no-print">
+                            <div className="flex justify-between items-center mb-8">
+                                <h2 className="text-2xl font-black text-slate-800 tracking-tighter uppercase italic">發票與財務錄入中心</h2>
+                                <button onClick={() => setInvoiceView('list')} className="bg-white border px-6 py-2 rounded-xl shadow-sm font-bold text-slate-500">返回列表</button>
                             </div>
-                            <div className="mt-12 flex gap-4">
+                            <div className="bg-white rounded-[3rem] p-10 shadow-sm border border-slate-100">
+                                {/* 類型切換器 */}
+                                <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-10 w-fit">
+                                    <button onClick={()=>setNewInvoiceData({...newInvoiceData, transactionType:'銷項'})} className={`px-10 py-3 rounded-xl font-black text-sm transition-all ${newInvoiceData.transactionType==='銷項'?'bg-indigo-600 text-white shadow-xl scale-105':'text-slate-400'}`}>銷項 (營收)</button>
+                                    <button onClick={()=>setNewInvoiceData({...newInvoiceData, transactionType:'進項'})} className={`px-10 py-3 rounded-xl font-black text-sm transition-all ${newInvoiceData.transactionType==='進項'?'bg-red-700 text-white shadow-xl scale-105':'text-slate-400'}`}>進項 (成本)</button>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
+                                    <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">發票號碼</label><input type="text" name="invNo" value={newInvoiceData.invNo} onChange={handleInvoiceInputChange} placeholder="XX-12345678" className="w-full px-6 py-4 rounded-2xl border font-mono text-xl focus:ring-4 focus:ring-indigo-100 transition-all outline-none" /></div>
+                                    <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">發票日期</label><input type="date" name="date" value={newInvoiceData.date} onChange={handleInvoiceInputChange} className="w-full px-6 py-4 rounded-2xl border font-bold" /></div>
+                                    <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">發票類型</label>
+                                        <select name="type" value={newInvoiceData.type} onChange={handleInvoiceInputChange} className="w-full px-6 py-4 rounded-2xl border bg-slate-50 font-bold outline-none">
+                                            <option value="三聯式">三聯式 (公司報帳用)</option><option value="二聯式">二聯式 (個人用)</option><option value="電子發票">電子發票</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">買受人 / 供應商名稱</label><input type="text" name="client" value={newInvoiceData.client} onChange={handleInvoiceInputChange} className="w-full px-6 py-4 rounded-2xl border font-black text-lg focus:ring-4 focus:ring-indigo-100 outline-none" /></div>
+                                    
+                                    {/* ⭐️ 重點更新：統一編號欄位 */}
+                                    <div className={`space-y-1 transition-all duration-500 ${newInvoiceData.type==='三聯式' ? 'opacity-100' : 'opacity-30'}`}>
+                                        <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">統一編號 (Tax ID)</label>
+                                        <div className="relative">
+                                            <input type="text" name="taxId" value={newInvoiceData.taxId} onChange={handleInvoiceInputChange} maxLength={8} placeholder="8位數字" className={`w-full px-6 py-4 rounded-2xl border font-mono text-xl tracking-widest outline-none ${newInvoiceData.type==='三聯式' ? 'bg-indigo-50 border-indigo-200 focus:ring-4 focus:ring-indigo-200' : 'bg-slate-50 cursor-not-allowed'}`} disabled={newInvoiceData.type!=='三聯式'} />
+                                            {newInvoiceData.taxId.length === 8 && <div className="absolute right-4 top-4 text-emerald-500"><i className="ph-fill ph-check-circle text-2xl"></i></div>}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 明細與稅額計算 */}
+                                <div className={`p-10 rounded-[3rem] text-white shadow-2xl transition-colors duration-700 ${newInvoiceData.transactionType==='進項'?'bg-red-950':'bg-indigo-950'}`}>
+                                    <div className="flex flex-col md:flex-row justify-between items-center gap-10">
+                                        <div className="flex gap-10 flex-wrap">
+                                            <div><div className="text-[10px] opacity-40 mb-1 uppercase tracking-widest">稅別</div>
+                                                <div className="flex bg-white/10 p-1 rounded-xl">
+                                                    <button onClick={()=>handleInvoiceInputChange({target:{name:'taxType', value:'taxable'}})} className={`px-6 py-2 text-xs rounded-lg transition-all ${newInvoiceData.taxType==='taxable'?'bg-white text-indigo-950 font-black shadow-lg':'text-white opacity-40'}`}>應稅 5%</button>
+                                                    <button onClick={()=>handleInvoiceInputChange({target:{name:'taxType', value:'exempt'}})} className={`px-6 py-2 text-xs rounded-lg transition-all ${newInvoiceData.taxType==='exempt'?'bg-white text-indigo-950 font-black shadow-lg':'text-white opacity-40'}`}>免稅</button>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-[10px] opacity-40 mb-1 uppercase tracking-widest">銷售額 (未稅)</div>
+                                                <input type="number" value={newInvoiceData.netAmount} onChange={(e)=>{
+                                                    const net = Number(e.target.value);
+                                                    const tax = newInvoiceData.taxType === 'taxable' ? Math.round(net * 0.05) : 0;
+                                                    setNewInvoiceData({...newInvoiceData, netAmount: net, tax, total: net + tax});
+                                                }} className="bg-transparent text-3xl font-black font-mono w-40 text-right outline-none border-b border-white/20" />
+                                            </div>
+                                            <div className="text-right border-l border-white/10 pl-10">
+                                                <div className="text-[10px] opacity-40 mb-1 uppercase tracking-widest">營業稅額</div>
+                                                <div className="text-3xl font-black font-mono text-emerald-400">${newInvoiceData.tax.toLocaleString()}</div>
+                                            </div>
+                                        </div>
+                                        <div className="text-right border-l border-white/10 pl-10">
+                                            <div className="text-[10px] opacity-40 mb-2 uppercase tracking-widest">總計金額 (含稅)</div>
+                                            <div className="text-6xl font-black font-mono text-emerald-400 underline decoration-4 underline-offset-8 decoration-emerald-500/50">${newInvoiceData.total.toLocaleString()}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
                                 <button onClick={()=>{
-                                    if(!newProductData.name) return showToast("品名必填");
-                                    if(editingProductId) setProductMaster(productMaster.map(p => p.id === editingProductId ? newProductData : p));
-                                    else setProductMaster([{...newProductData, id: newProductData.id || `SKU-${Date.now().toString().slice(-5)}`}, ...productMaster]);
-                                    setProductView('list'); setEditingProductId(null); showToast("存檔完成");
-                                }} className="flex-1 bg-indigo-600 text-white py-5 rounded-[2rem] font-black shadow-xl">儲存變更</button>
-                                <button onClick={()=>setProductView('list')} className="px-10 bg-slate-100 py-5 rounded-[2rem] font-bold">取消</button>
+                                    if(!newInvoiceData.invNo || !newInvoiceData.client) return showToast("單號與對象為必填");
+                                    if(newInvoiceData.type==='三聯式' && newInvoiceData.taxId.length!==8) return showToast("請確認統編為8碼數字");
+                                    
+                                    if(editingInvoiceId) setInvoices(invoices.map(i=>i.id===editingInvoiceId?newInvoiceData:i));
+                                    else setInvoices([{...newInvoiceData, id: generateId()}, ...invoices]);
+                                    
+                                    setInvoiceView('list'); showToast("財務憑證已存檔");
+                                }} className="w-full mt-10 bg-indigo-600 hover:bg-indigo-700 py-7 rounded-[2.5rem] text-white font-black text-2xl shadow-2xl active:scale-95 transition-all">確認儲存財務資料</button>
                             </div>
                         </div>
                     );
@@ -283,21 +336,125 @@
                 return (
                     <div className="p-8 animate-slide-in max-w-7xl mx-auto no-print">
                         <div className="flex justify-between items-center mb-8">
-                            <h2 className="text-2xl font-black tracking-widest text-slate-800 italic uppercase">商品資料主檔資料庫</h2>
+                            <h2 className="text-3xl font-black text-slate-800 italic tracking-tighter">財務收支與發票帳管</h2>
                             <div className="flex gap-4">
-                                <div className="flex bg-slate-200/50 p-1 rounded-2xl">
-                                    <button onClick={()=>exportData(productMaster, "商品資料庫")} className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-indigo-600"><i className="ph ph-export"></i> 匯出 JSON</button>
-                                    <button onClick={()=>fileInputRef.current.click()} className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-emerald-600"><i className="ph ph-import"></i> 還原資料</button>
-                                    <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={(e)=>importData(e, setProductMaster, "商品資料庫")} />
+                                <div className="flex bg-slate-200/50 p-1.5 rounded-2xl">
+                                    <button onClick={()=>exportData(invoices, "財務發票庫")} className="px-6 py-2 text-xs font-bold text-slate-600 hover:text-indigo-600"><i className="ph ph-export"></i> 備份</button>
+                                    <button onClick={()=>fileInputRef.current.click()} className="px-6 py-2 text-xs font-bold text-slate-600 hover:text-emerald-600"><i className="ph ph-import"></i> 還原</button>
+                                    <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={(e)=>importData(e, setInvoices, "發票資料庫")} />
                                 </div>
-                                <button onClick={()=>{setProductView('create'); setEditingProductId(null); setIsIdLocked(false); setNewProductData({id:'', supplier:'', name:'', specs:'', unitPrice:0})}} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black shadow-lg">+ 新增商品</button>
+                                <button onClick={()=>{setInvoiceView('create'); setEditingInvoiceId(null); setNewInvoiceData({invNo:'', type:'三聯式', transactionType:'銷項', taxType:'taxable', date:getToday(), client:'', taxId:'', items:[], netAmount:0, tax:0, total:0, status:'未付款'})}} className="bg-emerald-600 text-white px-8 py-3 rounded-2xl font-black shadow-xl hover:bg-emerald-700 transition-all">+ 錄入發票</button>
                             </div>
                         </div>
                         <div className="bg-white rounded-[2.5rem] border shadow-sm overflow-hidden">
                             <table className="w-full text-left table-fixed">
-                                <thead className="bg-slate-50 border-b"><tr><th className="p-6 text-xs text-slate-400 font-black w-[20%]">編號/供應商</th><th className="p-6 text-xs text-slate-400 font-black w-[50%]">品名規格</th><th className="p-6 text-xs text-slate-400 font-black text-right w-[15%]">單價</th><th className="p-6 text-xs text-slate-400 font-black text-center w-[15%]">操作</th></tr></thead>
+                                <thead className="bg-slate-50 border-b"><tr><th className="p-6 text-xs text-slate-400 font-black w-[20%]">發票號碼/類型</th><th className="p-6 text-xs text-slate-400 font-black w-[40%]">買受人/統編</th><th className="p-6 text-xs text-slate-400 font-black text-right w-[15%]">金額 (未/含稅)</th><th className="p-6 text-xs text-slate-400 font-black text-center w-[12%]">狀態</th><th className="p-6 text-xs text-slate-400 font-black text-center w-[13%]">操作</th></tr></thead>
                                 <tbody>
-                                    {productMaster.map(p => (<tr key={p.id} className="border-b hover:bg-slate-50 transition-colors"><td className="p-6 font-mono text-sm">{p.id}<div className="font-bold text-indigo-600 mt-1">{p.supplier || '未指定'}</div></td><td className="p-6 font-bold text-slate-800 text-lg break-words">{p.name}<div className="text-sm font-normal text-slate-500 mt-1">{p.specs}</div></td><td className="p-6 text-right font-black text-emerald-600 font-mono text-lg">${(p.unitPrice||0).toLocaleString()}</td><td className="p-6 text-center"><button onClick={()=>{setEditingProductId(p.id); setNewProductData(p); setProductView('create')}} className="bg-slate-100 px-4 py-2 rounded-xl text-sm font-bold">編輯</button></td></tr>))}
+                                    {invoices.map(inv => (
+                                        <tr key={inv.id} className="border-b hover:bg-slate-50 transition-all">
+                                            <td className="p-6 font-mono font-bold">{inv.invNo}<div className="text-[10px] font-normal text-slate-400 mt-1">{inv.type} | {inv.transactionType}</div></td>
+                                            <td className="p-6 font-black text-slate-800 text-lg truncate">{inv.client}<div className="text-[10px] font-mono text-indigo-500 mt-1">{inv.taxId ? `統編：${inv.taxId}` : '非公司戶'}</div></td>
+                                            <td className={`p-6 text-right font-mono font-black text-lg ${inv.transactionType==='進項'?'text-red-600':'text-emerald-600'}`}>{inv.transactionType==='進項'?'-':''}${inv.total.toLocaleString()}<div className="text-[10px] opacity-40 font-normal">稅額：${inv.tax.toLocaleString()}</div></td>
+                                            <td className="p-6 text-center"><button onClick={()=>{setInvoices(invoices.map(i=>i.id===inv.id?{...i, status:i.status==='已付款'?'未付款':'已付款'}:i))}} className={`px-4 py-1.5 rounded-full text-[10px] font-black border ${inv.status==='已付款'?'bg-emerald-50 text-emerald-700 border-emerald-100':'bg-amber-50 text-amber-700 border-amber-100'}`}>{inv.status}</button></td>
+                                            <td className="p-6 text-center"><button onClick={()=>{setEditingInvoiceId(inv.id); setNewInvoiceData(inv); setInvoiceView('create')}} className="p-3 bg-slate-100 rounded-2xl hover:bg-indigo-100 transition-all"><i className="ph ph-pencil-simple text-xl"></i></button></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            {invoices.length === 0 && <div className="p-20 text-center text-slate-300 font-black italic">目前無帳務資料，請點擊右上方新增</div>}
+                        </div>
+                    </div>
+                );
+            };
+
+            // ==========================================
+            // ⭐️ 智慧物流看板 (全量回歸)
+            // ==========================================
+            const renderLogisticsView = () => {
+                if (logisticsView === 'edit') {
+                    return (
+                        <div className="p-8 animate-slide-in max-w-4xl mx-auto no-print">
+                            <div className="flex justify-between items-center mb-8"><h2 className="text-2xl font-black text-slate-800">修正送貨任務</h2><button onClick={()=>setLogisticsView('list')} className="bg-white border px-6 py-2 rounded-xl">返回列表</button></div>
+                            <div className="bg-white rounded-[3rem] p-10 shadow-sm border">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                                    <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">客戶名稱</label><input type="text" value={tempLogisticsData.client} onChange={e=>setTempLogisticsData({...tempLogisticsData, client:e.target.value})} className="w-full px-5 py-4 rounded-2xl border font-bold" /></div>
+                                    <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">配送狀態</label>
+                                        <select value={tempLogisticsData.status} onChange={e=>setTempLogisticsData({...tempLogisticsData, status:e.target.value})} className="w-full px-5 py-4 rounded-2xl border font-bold">
+                                            <option value="待進貨">待進貨</option><option value="配送中">配送中</option><option value="已送達">已送達</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button onClick={()=>{
+                                    setLogistics(logistics.map(l => l.id === tempLogisticsData.id ? tempLogisticsData : l));
+                                    showToast("任務已更新"); setLogisticsView('list');
+                                }} className="w-full bg-indigo-600 text-white py-6 rounded-[2rem] font-black text-xl shadow-xl">儲存修正</button>
+                            </div>
+                        </div>
+                    );
+                }
+                return (
+                    <div className="p-8 animate-slide-in max-w-7xl mx-auto no-print">
+                        <div className="flex justify-between items-center mb-8"><h2 className="text-3xl font-black text-slate-800 italic">出貨物流管理看板</h2></div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                            {logistics.map(t=>(
+                                <div key={t.id} className="bg-white p-8 rounded-[3.5rem] border shadow-sm relative group overflow-hidden hover:shadow-2xl transition-all">
+                                    <div className={`absolute top-0 left-0 w-full h-2 ${t.status==='待進貨'?'bg-amber-400':t.status==='配送中'?'bg-blue-400':'bg-emerald-500'}`}></div>
+                                    <div className="mb-4 flex justify-between items-start">
+                                        <div><div className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{t.id}</div><h3 className="text-xl font-black text-slate-800 mt-1">{t.client}</h3></div>
+                                        <button onClick={()=>{setTempLogisticsData({...t}); setLogisticsView('edit');}} className="p-2 bg-slate-50 text-slate-400 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-all"><i className="ph ph-pencil-simple text-xl"></i></button>
+                                    </div>
+                                    <div className="bg-slate-50 p-6 rounded-[2.5rem] my-6 border border-slate-100 min-h-[140px] max-h-48 overflow-y-auto custom-scrollbar">
+                                        {t.items.map((it,i)=>(<div key={i} className="flex justify-between text-sm mb-2 border-b border-white pb-1"><span className="text-slate-600 font-bold truncate pr-4">{it.name}</span><span className="font-black text-indigo-600 shrink-0">x{it.qty}</span></div>))}
+                                    </div>
+                                    <button onClick={()=>handlePrint('delivery', t)} className="w-full py-4 bg-white border-2 border-emerald-600 text-emerald-700 rounded-2xl font-black text-xs mb-4 flex items-center justify-center gap-2 hover:bg-emerald-50 transition-all"><i className="ph ph-printer"></i> 列印一式四聯單</button>
+                                    {t.status !== '已送達' ? (
+                                        <button onClick={()=>{setLogistics(logistics.map(x=>x.id===t.id?{...x, status:t.status==='待進貨'?'配送中':'已送達'}:x)); showToast("進度已更新")}} className={`w-full py-4 rounded-2xl font-black shadow-xl text-sm text-white active:scale-95 transition-all ${t.status==='待進貨'?'bg-indigo-600 shadow-indigo-100':'bg-emerald-600 shadow-emerald-100'}`}>
+                                            {t.status==='待進貨'?'開始配送':'確認已送達簽收'}
+                                        </button>
+                                    ) : <div className="w-full py-4 bg-emerald-50 text-emerald-700 rounded-2xl font-black text-center text-xs italic border border-emerald-200">送貨任務已完成</div>}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            };
+
+            // ==========================================
+            // ⭐️ 智慧採購管理 (全量回歸)
+            // ==========================================
+            const renderOrderView = () => {
+                return (
+                    <div className="p-8 animate-slide-in max-w-7xl mx-auto no-print">
+                        <div className="flex justify-between items-center mb-8">
+                            <h2 className="text-3xl font-black text-slate-800 italic uppercase tracking-tighter">採購訂貨管理中心</h2>
+                            <button onClick={() => {
+                                const confirmed = quotes.filter(q => q.status === '已確認' && !orders.some(o => o.refQuote === q.id));
+                                if(!confirmed.length) return showToast("無可拋轉的單據");
+                                const newO = [...orders], newL = [...logistics];
+                                confirmed.forEach(q => {
+                                    const groups = {};
+                                    q.items.forEach(i => { const s = i.supplier || '未指定廠牌'; if(!groups[s]) groups[s]=[]; groups[s].push(i); });
+                                    Object.keys(groups).forEach(sup => {
+                                        const poId = `PO-${getToday().replace(/-/g,'')}-${generateId().substring(0,4).toUpperCase()}`;
+                                        newO.push({ id: poId, date: getToday(), supplier: sup, refQuote: q.id, client: q.client, items: groups[sup], customRemark: `報價單：${q.id}`, amount: groups[sup].reduce((s,i)=>s+(i.qty*i.unitPrice),0) });
+                                        newL.push({ id: `DO-${poId.split('-')[2]}`, client: q.client, refPo: poId, items: groups[sup], status: '待進貨' });
+                                    });
+                                });
+                                setOrders(newO); setLogistics(newL); showToast("智慧拆單拋轉完成");
+                            }} className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black shadow-xl hover:bg-indigo-700 transition-all flex items-center gap-2 scale-105 active:scale-95"><i className="ph ph-magic-wand"></i> 執行智慧拆單拋轉</button>
+                        </div>
+                        <div className="bg-white rounded-[3rem] border shadow-sm overflow-hidden">
+                            <table className="w-full text-left table-fixed">
+                                <thead className="bg-slate-50 border-b"><tr><th className="p-6 text-xs text-slate-400 font-black w-[20%]">採購單號/日期</th><th className="p-6 text-xs text-slate-400 font-black w-[35%]">供應商/廠牌</th><th className="p-6 text-xs text-slate-400 font-black w-[25%]">採購備註</th><th className="p-6 text-xs text-slate-400 font-black text-center w-[20%]">操作</th></tr></thead>
+                                <tbody>
+                                    {orders.map(o => (
+                                        <tr key={o.id} className="border-b hover:bg-slate-50 transition-all">
+                                            <td className="p-6 font-mono font-bold">{o.id}<div className="text-[10px] font-normal text-slate-400 mt-1">{o.date}</div></td>
+                                            <td className="p-6 font-black text-indigo-700 text-lg uppercase">{o.supplier}</td>
+                                            <td className="p-6"><input type="text" value={o.customRemark || ''} onChange={(e) => setOrders(orders.map(x => x.id === o.id ? {...x, customRemark: e.target.value} : x))} className="w-full bg-slate-50 px-4 py-2.5 rounded-xl text-sm border-2 border-transparent focus:border-indigo-400 outline-none transition-all font-bold" placeholder="點擊編輯備註..." /></td>
+                                            <td className="p-6 text-center flex justify-center gap-2"><button onClick={()=>handlePrint('order', o)} className="bg-amber-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-amber-600 transition-all">列印明細</button></td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>
@@ -306,48 +463,68 @@
             };
 
             // ==========================================
-            // ⭐️ 財務發票系統 (支援匯出匯入)
+            // ⭐️ 估價單管理 (v4.3 規格相容)
             // ==========================================
-            const renderInvoiceView = () => {
-                if (invoiceView === 'create') {
+            const renderQuoteView = () => {
+                if (quoteView === 'create') {
                     return (
-                        <div className="p-8 animate-slide-in max-w-5xl mx-auto">
-                            <div className="flex justify-between items-center mb-8"><h2 className="text-2xl font-black">發票帳務錄入</h2><button onClick={() => setInvoiceView('list')} className="bg-white border px-6 py-2 rounded-xl shadow-sm font-bold">返回</button></div>
-                            <div className="bg-white rounded-[3rem] p-10 shadow-sm border border-slate-100">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-                                    <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase">發票號碼</label><input type="text" value={newInvoiceData.invNo} onChange={(e)=>setNewInvoiceData({...newInvoiceData, invNo: e.target.value.toUpperCase()})} className="w-full px-5 py-4 rounded-2xl border font-mono text-xl" /></div>
-                                    <div className="space-y-1"><label className="text-[10px] font-black text-slate-400">日期</label><input type="date" value={newInvoiceData.date} onChange={(e)=>setNewInvoiceData({...newInvoiceData, date: e.target.value})} className="w-full px-5 py-4 rounded-2xl border" /></div>
-                                    <div className="md:col-span-1 space-y-1"><label className="text-[10px] font-black text-slate-400">對象</label><input type="text" value={newInvoiceData.client} onChange={(e)=>setNewInvoiceData({...newInvoiceData, client: e.target.value})} className="w-full px-5 py-4 rounded-2xl border font-bold" /></div>
+                        <div className="p-8 animate-slide-in max-w-7xl mx-auto no-print">
+                            <div className="flex justify-between items-center mb-8"><h2 className="text-2xl font-black">新增/編輯估價單</h2><button onClick={()=>setQuoteView('list')} className="bg-white border px-6 py-2 rounded-xl">返回</button></div>
+                            <div className="bg-white p-10 rounded-[3rem] border shadow-sm mb-10">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+                                    <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400">客戶名稱</label><input type="text" value={newQuoteData.client} onChange={(e)=>setNewQuoteData({...newQuoteData, client:e.target.value})} className="w-full px-5 py-4 rounded-2xl border font-bold" /></div>
+                                    <div className="space-y-1"><label className="text-[10px] font-black text-slate-400">開立日期</label><input type="date" value={newQuoteData.date} onChange={(e)=>setNewQuoteData({...newQuoteData, date:e.target.value})} className="w-full px-5 py-4 rounded-2xl border" /></div>
                                 </div>
-                                <div className={`p-8 rounded-[3rem] text-white ${newInvoiceData.transactionType==='進項'?'bg-red-900':'bg-indigo-900'}`}>
-                                    <div className="text-right"><div className="text-[10px] opacity-50 uppercase tracking-widest">總計金額</div><div className="text-5xl font-black font-mono text-emerald-400">${newInvoiceData.total.toLocaleString()}</div></div>
+                                <div className="bg-slate-50 p-10 rounded-[3rem] space-y-6">
+                                    <h3 className="font-black text-lg">商品明細 (可手動或搜尋)</h3>
+                                    {newQuoteData.items.map((it, idx) => (
+                                        <div key={idx} className="flex gap-4 items-center bg-white p-4 rounded-2xl border group">
+                                            <input type="text" placeholder="品名" value={it.name} onChange={e=>{const next=[...newQuoteData.items]; next[idx].name=e.target.value; setNewQuoteData({...newQuoteData, items:next})}} className="flex-1 px-4 py-2 rounded-xl border font-bold" />
+                                            <input type="text" placeholder="規格" value={it.specs} onChange={e=>{const next=[...newQuoteData.items]; next[idx].specs=e.target.value; setNewQuoteData({...newQuoteData, items:next})}} className="w-48 px-4 py-2 rounded-xl border" />
+                                            <input type="number" placeholder="數量" value={it.qty} onChange={e=>{const next=[...newQuoteData.items]; next[idx].qty=Number(e.target.value); setNewQuoteData({...newQuoteData, items:next})}} className="w-24 px-4 py-2 rounded-xl border text-center font-mono" />
+                                            <input type="number" placeholder="單價" value={it.unitPrice} onChange={e=>{const next=[...newQuoteData.items]; next[idx].unitPrice=Number(e.target.value); setNewQuoteData({...newQuoteData, items:next})}} className="w-32 px-4 py-2 rounded-xl border text-right font-mono" />
+                                            <button onClick={()=>{const next=newQuoteData.items.filter((_,i)=>i!==idx); setNewQuoteData({...newQuoteData, items:next})}} className="text-red-300 hover:text-red-500 transition-all"><i className="ph ph-trash text-xl"></i></button>
+                                        </div>
+                                    ))}
+                                    <button onClick={()=>setNewQuoteData({...newQuoteData, items:[...newQuoteData.items, {name:'', specs:'', qty:1, unitPrice:0}]})} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-[2rem] text-slate-400 font-bold hover:bg-white">+ 新增空白品項</button>
                                 </div>
-                                <button onClick={()=>{
-                                    if(editingInvoiceId) setInvoices(invoices.map(i => i.id === editingInvoiceId ? newInvoiceData : i));
-                                    else setInvoices([{...newInvoiceData, id: generateId()}, ...invoices]);
-                                    setInvoiceView('list'); showToast("帳務已存檔");
-                                }} className="w-full mt-10 bg-indigo-600 text-white py-6 rounded-[2rem] font-black text-xl shadow-xl">確認儲存發票資料</button>
+                                <div className="mt-10 flex justify-between items-center p-10 bg-slate-900 text-white rounded-[3rem]">
+                                    <div className="text-xl font-black">大寫總計：{numberToChinese(newQuoteData.items.reduce((s,i)=>s+(i.qty*i.unitPrice),0))}</div>
+                                    <div className="text-right">
+                                        <div className="text-4xl font-black font-mono text-emerald-400 mb-6">NT$ {newQuoteData.items.reduce((s,i)=>s+(i.qty*i.unitPrice),0).toLocaleString()}</div>
+                                        <button onClick={()=>{
+                                            const total = newQuoteData.items.reduce((s,i)=>s+(i.qty*i.unitPrice),0);
+                                            const q = { ...newQuoteData, id: editingQuoteId || `Q-${generateId().toUpperCase()}`, amount: total, status: '草稿' };
+                                            if(editingQuoteId) setQuotes(quotes.map(x=>x.id===editingQuoteId?q:x));
+                                            else setQuotes([q, ...quotes]);
+                                            setQuoteView('list'); showToast("估價單存檔成功");
+                                        }} className="bg-emerald-600 text-white px-12 py-5 rounded-[2.5rem] font-black text-xl shadow-xl active:scale-95 transition-all">確認儲存估價單</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     );
                 }
                 return (
-                    <div className="p-8 animate-slide-in max-w-7xl mx-auto">
-                        <div className="flex justify-between items-center mb-8">
-                            <h2 className="text-3xl font-black text-slate-800 italic uppercase">財務發票帳務管理</h2>
-                            <div className="flex gap-4">
-                                <div className="flex bg-slate-200/50 p-1 rounded-2xl">
-                                    <button onClick={()=>exportData(invoices, "發票資料庫")} className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-indigo-600"><i className="ph ph-export"></i> 匯出</button>
-                                    <button onClick={()=>fileInputRef.current.click()} className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-emerald-600"><i className="ph ph-import"></i> 還原</button>
-                                    <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={(e)=>importData(e, setInvoices, "發票資料庫")} />
-                                </div>
-                                <button onClick={()=>{setInvoiceView('create'); setEditingInvoiceId(null); setNewInvoiceData({invNo:'', type:'三聯式', transactionType:'銷項', taxType:'taxable', date:getToday(), client:'', taxId:'', items:[], netAmount:0, tax:0, total:0, status:'未付款'})}} className="bg-emerald-600 text-white px-8 py-3 rounded-2xl font-black shadow-xl">+ 錄入發票</button>
-                            </div>
-                        </div>
-                        <div className="bg-white rounded-[2.5rem] border shadow-sm overflow-hidden">
+                    <div className="p-8 animate-slide-in max-w-7xl mx-auto no-print">
+                        <div className="flex justify-between items-center mb-8"><h2 className="text-3xl font-black text-slate-800 italic">估價單管理系統</h2><button onClick={()=>{setQuoteView('create'); setEditingQuoteId(null); setNewQuoteData({client:'', contacts:[{name:'', phone:''}], date:getToday(), items:[]})}} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black shadow-xl">+ 新增估價單</button></div>
+                        <div className="bg-white rounded-[3rem] border shadow-sm overflow-hidden">
                             <table className="w-full text-left table-fixed">
-                                <thead className="bg-slate-50 border-b"><tr><th className="p-6 text-xs text-slate-400 font-black w-[20%]">單號/日期</th><th className="p-6 text-xs text-slate-400 font-black w-[45%]">對象</th><th className="p-6 text-xs text-slate-400 font-black text-right w-[15%]">總額</th><th className="p-6 text-xs text-slate-400 font-black text-center w-[10%]">狀態</th><th className="p-6 text-xs text-slate-400 font-black text-center w-[10%]">操作</th></tr></thead>
-                                <tbody>{invoices.map(inv => (<tr key={inv.id} className="border-b hover:bg-slate-50 transition-colors"><td className="p-6 font-mono font-bold">{inv.invNo}<div className="text-[10px] text-slate-400 font-normal">{inv.date}</div></td><td className="p-6 font-bold text-slate-800 text-lg truncate">{inv.client}</td><td className={`p-6 text-right font-black font-mono text-lg ${inv.transactionType==='進項'?'text-red-500':'text-emerald-600'}`}>{inv.transactionType==='進項'?'-':''}${inv.total.toLocaleString()}</td><td className="p-6 text-center"><span className={`px-3 py-1 rounded-full text-[10px] font-black ${inv.status==='已付款'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'}`}>{inv.status}</span></td><td className="p-6 text-center"><button onClick={()=>{setEditingInvoiceId(inv.id); setNewInvoiceData(inv); setInvoiceView('create')}} className="text-slate-300 hover:text-indigo-600 transition-all"><i className="ph ph-pencil-simple text-xl"></i></button></td></tr>))}</tbody>
+                                <thead className="bg-slate-50 border-b"><tr><th className="p-6 text-xs text-slate-400 font-black w-[20%]">單號/日期</th><th className="p-6 text-xs text-slate-400 font-black w-[45%]">客戶對象</th><th className="p-6 text-xs text-slate-400 font-black text-right w-[15%]">總額</th><th className="p-6 text-xs text-slate-400 font-black text-center w-[20%]">操作</th></tr></thead>
+                                <tbody>
+                                    {quotes.map(q => (
+                                        <tr key={q.id} className="border-b hover:bg-slate-50">
+                                            <td className="p-6 font-mono font-bold">{q.id}<div className="text-[10px] font-normal text-slate-400 mt-1">{q.date}</div></td>
+                                            <td className="p-6 font-black text-slate-800 text-lg truncate">{q.client}</td>
+                                            <td className="p-6 text-right font-black font-mono text-lg text-indigo-600">${(q.amount||0).toLocaleString()}</td>
+                                            <td className="p-6 text-center flex justify-center gap-2">
+                                                <button onClick={()=>handlePrint('quote', q)} className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-xl text-xs font-bold border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all">列印</button>
+                                                {q.status !== '已確認' && <button onClick={()=>{setQuotes(quotes.map(x=>x.id===q.id?{...x, status:'已確認'}:x)); showToast("報價已確認")}} className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold">確認</button>}
+                                                <button onClick={()=>{setEditingQuoteId(q.id); setNewQuoteData(q); setQuoteView('create')}} className="p-3 bg-slate-100 rounded-2xl"><i className="ph ph-pencil-simple text-xl"></i></button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
                             </table>
                         </div>
                     </div>
@@ -355,89 +532,81 @@
             };
 
             // ==========================================
-            // ⭐️ 估價單管理 (v4.3 功能)
+            // ⭐️ 商品資料庫 (全量回歸)
             // ==========================================
-            const renderQuoteView = () => {
-                if (quoteView === 'create') {
+            const renderProductView = () => {
+                if (productView === 'create') {
                     return (
-                        <div className="animate-slide-in max-w-7xl mx-auto no-print">
-                            <div className="bg-white p-10 rounded-[3rem] border shadow-sm mb-6">
-                                <div className="grid grid-cols-1 md:grid-cols-12 gap-8 mb-8">
-                                    <div className="md:col-span-4"><label className="block text-[10px] font-black text-slate-400 mb-2 uppercase">客戶台照</label><input type="text" value={newQuoteData.client} onChange={(e)=>setNewQuoteData({...newQuoteData, client:e.target.value})} className="w-full px-5 py-4 rounded-2xl border font-bold" /></div>
-                                    <div className="md:col-span-3"><label className="block text-[10px] font-black text-slate-400 mb-2 uppercase">開立日期</label><input type="date" value={newQuoteData.date} onChange={(e)=>setNewQuoteData({...newQuoteData, date:e.target.value})} className="w-full px-5 py-4 rounded-2xl border" /></div>
-                                    <div className="md:col-span-12 mt-4">
-                                        <label className="block text-[10px] font-black text-indigo-500 mb-4 uppercase tracking-widest">聯絡窗口資訊 (可新增多組)</label>
-                                        <div className="space-y-4">
-                                            {(newQuoteData.contacts || []).map((c, i) => (
-                                                <div key={i} className="flex gap-4 items-center bg-slate-50 p-4 rounded-2xl border">
-                                                    <div className="flex-1"><input type="text" placeholder="資訊 (如: 先生/小姐)" value={c.name} onChange={(e)=>{const next=[...newQuoteData.contacts]; next[i].name=e.target.value; setNewQuoteData({...newQuoteData, contacts:next})}} className="w-full px-4 py-2 rounded-xl border bg-white" /></div>
-                                                    <div className="flex-1"><input type="text" placeholder="電話號碼" value={c.phone} onChange={(e)=>{const next=[...newQuoteData.contacts]; next[i].phone=e.target.value; setNewQuoteData({...newQuoteData, contacts:next})}} className="w-full px-4 py-2 rounded-xl border bg-white font-mono" /></div>
-                                                    {i > 0 && <button onClick={()=>{setNewQuoteData({...newQuoteData, contacts:newQuoteData.contacts.filter((_,idx)=>idx!==i)})}} className="text-slate-300 hover:text-red-500"><i className="ph-fill ph-minus-circle text-xl"></i></button>}
-                                                </div>
-                                            ))}
-                                            <button onClick={()=>{setNewQuoteData({...newQuoteData, contacts:[...(newQuoteData.contacts||[]), {name:'', phone:''}]})}} className="text-xs font-bold text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl tracking-tighter">+ 增加窗口</button>
-                                        </div>
-                                    </div>
+                        <div className="p-8 animate-slide-in max-w-3xl mx-auto no-print">
+                            <h2 className="text-2xl font-black mb-8">商品主檔維護</h2>
+                            <div className="bg-white p-10 rounded-[3rem] border shadow-sm">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                                    <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">編號 (SKU)</label><input type="text" value={newProductData.id} onChange={e=>setNewProductData({...newProductData, id:e.target.value})} className="w-full px-5 py-4 rounded-2xl border font-mono" /></div>
+                                    <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">廠牌</label><input type="text" value={newProductData.supplier} onChange={e=>setNewProductData({...newProductData, supplier:e.target.value})} className="w-full px-5 py-4 rounded-2xl border" /></div>
+                                    <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">品名</label><input type="text" value={newProductData.name} onChange={e=>setNewProductData({...newProductData, name:e.target.value})} className="w-full px-5 py-4 rounded-2xl border font-black text-lg" /></div>
+                                    <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">規格</label><input type="text" value={newProductData.specs} onChange={e=>setNewProductData({...newProductData, specs:e.target.value})} className="w-full px-5 py-4 rounded-2xl border" /></div>
+                                    <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">預設單價</label><input type="number" value={newProductData.unitPrice} onChange={e=>setNewProductData({...newProductData, unitPrice:Number(e.target.value)})} className="w-full px-5 py-4 rounded-2xl border font-mono text-right" /></div>
                                 </div>
-                                <div className="bg-slate-50 p-8 rounded-[2.5rem] flex flex-wrap gap-6 items-end">
-                                    <div className="flex-1 min-w-[280px] relative"><label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest">快速搜尋商品庫</label><input type="text" value={quoteSearch} onChange={(e)=>{setQuoteSearch(e.target.value); setShowDropdown(true)}} className="w-full px-5 py-4 rounded-2xl border bg-white font-bold text-indigo-700" />{showDropdown && quoteSearch && (<div className="absolute z-30 w-full mt-2 bg-white border rounded-2xl shadow-2xl max-h-48 overflow-y-auto">{productMaster.filter(p => (p.name || '').toLowerCase().includes(quoteSearch.toLowerCase())).map(p => (<div key={p.id} className="p-4 hover:bg-indigo-50 cursor-pointer border-b flex justify-between" onClick={()=>{setQuoteSearch(p.name); setCustomSpec(p.specs); setCustomPrice(p.unitPrice); setShowDropdown(false)}}><div className="font-bold text-sm">{p.name}</div><div className="font-mono text-emerald-600 font-black">${p.unitPrice}</div></div>))}</div>)}</div>
-                                    <div className="w-48"><label className="block text-[10px] font-black text-slate-400 mb-2 uppercase">規格</label><input type="text" value={customSpec} onChange={(e)=>setCustomSpec(e.target.value)} className="w-full px-5 py-4 rounded-2xl border bg-white shadow-sm" /></div>
-                                    <div className="w-32"><label className="block text-[10px] font-black text-slate-400 mb-2 uppercase">單價</label><input type="number" value={customPrice} onChange={(e)=>setCustomPrice(e.target.value)} className="w-full px-5 py-4 rounded-2xl border bg-white text-right font-mono" /></div>
-                                    <div className="w-24"><label className="block text-[10px] font-black text-slate-400 mb-2 uppercase">數量</label><input type="number" value={qty} onChange={(e)=>setQty(parseInt(e.target.value)||1)} className="w-full px-5 py-4 rounded-2xl border bg-white text-center font-mono" /></div>
-                                    <button onClick={()=>{setNewQuoteData({...newQuoteData, items:[...newQuoteData.items, {name:quoteSearch, specs:customSpec, unitPrice:Number(customPrice), qty:Number(qty)}]}); setQuoteSearch(''); setCustomSpec(''); setCustomPrice(''); setQty(1)}} className="bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black shadow-lg hover:bg-indigo-700 active:scale-95 transition-all">加入明細</button>
-                                </div>
+                                <button onClick={()=>{
+                                    if(!newProductData.name) return showToast("品名必填");
+                                    setProductMaster([{...newProductData, id: newProductData.id || generateId()}, ...productMaster]);
+                                    setProductView('list'); showToast("商品已建檔");
+                                }} className="w-full bg-indigo-600 text-white py-6 rounded-[2rem] font-black text-xl shadow-xl">完成存檔</button>
                             </div>
-                            {newQuoteData.items.length > 0 && (
-                                <div className="bg-white rounded-[3rem] shadow-2xl border overflow-hidden">
-                                    <table className="w-full text-left table-fixed border-collapse">
-                                        <thead className="bg-slate-50 border-b"><tr><th className="p-5 text-xs text-slate-400 uppercase w-[40%]">品名規格描述</th><th className="p-5 text-center text-xs text-slate-400 w-[10%]">數量</th><th className="p-5 text-right text-xs text-slate-400 w-[15%]">單價</th><th className="p-5 text-right text-xs text-slate-400 w-[20%]">合計額</th><th className="p-5 text-center w-[15%]">操作</th></tr></thead>
-                                        <tbody>{newQuoteData.items.map((it, idx) => (<tr key={idx} className="border-b"><td className="p-5 font-bold text-slate-700 break-words">{it.name}<div className="text-[10px] font-normal text-slate-400 mt-1 italic">{it.specs}</div></td><td className="p-5 text-center font-mono">{it.qty}</td><td className="p-5 text-right font-mono">${it.unitPrice.toLocaleString()}</td><td className="p-5 text-right font-black text-indigo-600 font-mono text-lg">${(it.qty * it.unitPrice).toLocaleString()}</td><td className="p-5 text-center"><button onClick={()=>setNewQuoteData({...newQuoteData, items:newQuoteData.items.filter((_,i)=>i!==idx)})} className="text-red-300 hover:text-red-500 transition-colors"><i className="ph ph-trash"></i></button></td></tr>))}</tbody>
-                                    </table>
-                                    <div className="p-12 flex justify-between bg-slate-50 border-t items-center flex-wrap">
-                                        <div className="bg-white p-5 rounded-[2rem] border-l-8 border-l-emerald-500 font-black shadow-sm text-emerald-800 tracking-widest">{numberToChinese(newQuoteData.items.reduce((s,i)=>s+(i.qty*i.unitPrice),0))}</div>
-                                        <div className="text-right"><div className="text-5xl font-black mb-8 font-mono text-slate-800 tracking-tighter italic">總計: ${newQuoteData.items.reduce((s,i)=>s+(i.qty*i.unitPrice),0).toLocaleString()}</div><button onClick={()=>{const q={...newQuoteData, id: editingQuoteId || `Q-${getToday().replace(/-/g,'')}-${quotes.length+1}`, amount: newQuoteData.items.reduce((s,i)=>s+(i.qty*i.unitPrice),0), status: '草稿'}; if(editingQuoteId) setQuotes(quotes.map(x=>x.id===editingQuoteId?q:x)); else setQuotes([q,...quotes]); setQuoteView('list'); showToast("存檔完成")}} className="bg-indigo-600 text-white px-12 py-5 rounded-[2.5rem] font-black shadow-2xl active:scale-95 transition-all">確認儲存</button></div>
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     );
                 }
                 return (
                     <div className="p-8 animate-slide-in max-w-7xl mx-auto no-print">
-                        <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-black text-slate-800 uppercase italic">報價與估價管理中樞</h2><button onClick={()=>{setQuoteView('create'); setEditingQuoteId(null); setNewQuoteData({client:'', contacts:[{name:'', phone:''}], date:getToday(), items:[]})}} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black shadow-lg hover:bg-indigo-700 transition-all">+ 新增估價單</button></div>
-                        <div className="bg-white rounded-[2.5rem] border shadow-sm overflow-hidden"><table className="w-full text-left table-fixed"><thead className="bg-slate-50 border-b"><tr><th className="p-6 text-xs text-slate-400 font-black w-[20%]">編號/日期</th><th className="p-6 text-xs text-slate-400 font-black w-[45%]">客戶名稱</th><th className="p-6 text-xs text-slate-400 font-black text-right w-[15%]">金額</th><th className="p-6 text-xs text-slate-400 font-black text-center w-[20%]">操作</th></tr></thead><tbody>{quotes.map(q => (<tr key={q.id} className="border-b hover:bg-slate-50 transition-colors"><td className="p-6 font-mono text-sm">{q.id}<div className="text-xs font-normal text-slate-400 mt-1">{q.date}</div></td><td className="p-6 font-bold text-slate-800 text-lg break-words">{q.client}<div className="text-xs font-normal text-slate-400 mt-1">{(q.contacts||[]).map(c=>`${c.name} ${c.phone}`).join(' / ')}</div></td><td className="p-6 text-right font-black text-slate-700 font-mono text-lg">${(q.amount||0).toLocaleString()}</td><td className="p-6 text-center flex justify-center gap-2"><button onClick={()=>handlePrint('quote', q)} className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-xl text-xs font-bold border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all">列印</button><button onClick={()=>{setEditingQuoteId(q.id); setNewQuoteData(q); setQuoteView('create')}} className="bg-slate-100 p-3 rounded-2xl"><i className="ph ph-pencil-simple"></i></button></td></tr>))}</tbody></table></div>
+                        <div className="flex justify-between items-center mb-8"><h2 className="text-3xl font-black italic">商品資料庫</h2><button onClick={()=>{setProductView('create'); setNewProductData({id:'', supplier:'', name:'', specs:'', unitPrice:0})}} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black shadow-xl">+ 新增商品</button></div>
+                        <div className="bg-white rounded-[3rem] border shadow-sm overflow-hidden">
+                            <table className="w-full text-left table-fixed">
+                                <thead className="bg-slate-50 border-b"><tr><th className="p-6 text-xs text-slate-400 font-black w-[20%]">編號/供應商</th><th className="p-6 text-xs text-slate-400 font-black w-[50%]">品名規格</th><th className="p-6 text-xs text-slate-400 font-black text-right w-[15%]">單價</th><th className="p-6 text-xs text-slate-400 font-black text-center w-[15%]">操作</th></tr></thead>
+                                <tbody>{productMaster.map(p=>(<tr key={p.id} className="border-b hover:bg-slate-50"><td className="p-6 font-mono text-xs">{p.id}<div className="font-bold text-indigo-600 mt-1">{p.supplier}</div></td><td className="p-6 font-black text-slate-800 text-lg truncate">{p.name}<div className="text-sm font-normal text-slate-400 mt-1">{p.specs}</div></td><td className="p-6 text-right font-mono font-black text-lg text-emerald-600">${(p.unitPrice||0).toLocaleString()}</td><td className="p-6 text-center"><button onClick={()=>setProductMaster(productMaster.filter(x=>x.id!==p.id))} className="text-red-300 hover:text-red-500 transition-all"><i className="ph ph-trash text-xl"></i></button></td></tr>))}</tbody>
+                            </table>
+                        </div>
                     </div>
                 );
             };
 
             const renderDashboard = () => (
-                <div className="p-8 animate-slide-in max-w-7xl mx-auto no-print text-center">
-                    <h2 className="text-4xl font-black text-slate-900 uppercase italic mb-4">申堡營運管理系統 v4.4</h2>
-                    <p className="text-slate-400 font-bold mb-12">數據保全與列印優化版</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-                        <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm"><div className="text-5xl font-black text-indigo-600 mb-2">{productMaster.length}</div><p className="text-xs font-black text-slate-400 uppercase tracking-widest">已建檔商品</p></div>
-                        <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm"><div className="text-5xl font-black text-emerald-600 mb-2">{quotes.length}</div><p className="text-xs font-black text-slate-400 uppercase tracking-widest">總估價單數</p></div>
+                <div className="p-20 text-center animate-slide-in">
+                    <h1 className="text-5xl font-black text-slate-900 italic tracking-tighter mb-4 uppercase">申堡營運管理旗艦中樞 <span className="text-xl bg-indigo-600 text-white px-3 py-1 rounded-lg">v4.5</span></h1>
+                    <p className="text-slate-400 font-bold text-lg mb-12">專業家具業會計、採購與物流一站式解決方案</p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-10 max-w-5xl mx-auto mb-16">
+                        <div className="bg-white p-12 rounded-[3.5rem] border shadow-sm relative overflow-hidden group hover:shadow-2xl transition-all">
+                            <div className="text-6xl font-black text-indigo-600 mb-4">{quotes.length}</div>
+                            <div className="text-xs font-black text-slate-400 uppercase tracking-widest">總估價單數</div>
+                        </div>
+                        <div className="bg-white p-12 rounded-[3.5rem] border shadow-sm relative overflow-hidden group hover:shadow-2xl transition-all">
+                            <div className="text-6xl font-black text-emerald-600 mb-4">{logistics.filter(l=>l.status!=='已送達').length}</div>
+                            <div className="text-xs font-black text-slate-400 uppercase tracking-widest">待配送任務</div>
+                        </div>
+                        <div className="bg-white p-12 rounded-[3.5rem] border shadow-sm relative overflow-hidden group hover:shadow-2xl transition-all">
+                            <div className="text-6xl font-black text-red-600 mb-4">{invoices.filter(i=>i.status!=='已付款').length}</div>
+                            <div className="text-xs font-black text-slate-400 uppercase tracking-widest">待收付款項</div>
+                        </div>
                     </div>
-                    <button onClick={() => {
-                        const backup = { products: productMaster, quotes, orders, logistics, invoices };
+                    <button onClick={()=>{
+                        const backup = { products:productMaster, quotes, orders, logistics, invoices };
                         exportData(backup, "申堡全系統營運備份");
-                    }} className="mt-12 bg-slate-900 text-white px-10 py-5 rounded-[2.5rem] font-black shadow-2xl hover:bg-black transition-all">匯出全系統總雲端報表</button>
+                    }} className="bg-slate-900 text-white px-12 py-5 rounded-[2.5rem] font-black shadow-2xl hover:bg-black transition-all active:scale-95">匯出全系統總雲端報表</button>
                 </div>
             );
 
             const menuItems = [
-                { id: 'dashboard', name: '智慧儀表板', icon: 'ph-chart-pie' },
+                { id: 'dashboard', name: '營運指揮中心', icon: 'ph-chart-pie' },
                 { id: 'products', name: '商品主檔庫', icon: 'ph-database' },
                 { id: 'quotations', name: '估價單系統', icon: 'ph-file-text' },
                 { id: 'orders', name: '採購管理', icon: 'ph-shopping-cart' },
-                { id: 'logistics', name: '出貨與簽收', icon: 'ph-truck' },
+                { id: 'logistics', name: '出貨與物流', icon: 'ph-truck' },
                 { id: 'invoices', name: '財務發票系統', icon: 'ph-receipt' }
             ];
 
             return (
                 <div className="flex h-screen w-full bg-slate-50 overflow-hidden font-sans">
                     <aside className="hidden md:flex w-72 bg-slate-900 h-full text-white flex-col shadow-2xl z-20 no-print">
-                        <div className="p-6 border-b border-slate-800"><h1 className="text-xl font-black italic flex items-center gap-2 tracking-tighter">申堡中樞 <span className="text-[10px] bg-indigo-500 px-2 py-0.5 rounded italic">v4.4</span></h1></div>
+                        <div className="p-6 border-b border-slate-800"><h1 className="text-xl font-black italic tracking-tighter flex items-center gap-2 uppercase">申堡中樞 <span className="text-[10px] bg-indigo-500 px-2 py-0.5 rounded italic">v4.5</span></h1></div>
                         <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
                             {menuItems.map(item => (
                                 <button key={item.id} onClick={() => { setActiveTab(item.id); setPrintDoc(null); setLogisticsView('list'); setInvoiceView('list'); setQuoteView('list'); setProductView('list'); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all font-bold ${activeTab === item.id && !printDoc ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}>
@@ -447,7 +616,7 @@
                         </nav>
                         <div className="p-5 border-t border-slate-800 bg-slate-950/50 flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-emerald-400 flex items-center justify-center font-bold">莊</div>
-                            <div className="text-left"><div className="text-sm font-bold">莊惠呅</div><div className="text-[10px] text-slate-500 uppercase font-black tracking-widest">營運管理</div></div>
+                            <div className="text-left"><div className="text-sm font-bold">莊惠呅</div><div className="text-[10px] text-slate-500 uppercase font-black tracking-widest">營運管理專家</div></div>
                         </div>
                     </aside>
 
@@ -456,10 +625,9 @@
                         {!printDoc && activeTab === 'dashboard' && renderDashboard()}
                         {!printDoc && activeTab === 'products' && renderProductView()}
                         {!printDoc && activeTab === 'quotations' && renderQuoteView()}
+                        {!printDoc && activeTab === 'orders' && renderOrderView()}
+                        {!printDoc && activeTab === 'logistics' && renderLogisticsView()}
                         {!printDoc && activeTab === 'invoices' && renderInvoiceView()}
-                        {/* 出貨與採購維持既有穩定邏輯 */}
-                        {!printDoc && activeTab === 'orders' && <div className="p-8 text-center text-slate-300 font-black italic">採購功能整合中，邏輯與 v4.3 一致</div>}
-                        {!printDoc && activeTab === 'logistics' && <div className="p-8 text-center text-slate-300 font-black italic">物流功能整合中，邏輯與 v4.3 一致</div>}
                     </main>
 
                     <nav className="md:hidden fixed bottom-0 w-full bg-white border-t p-3 flex justify-around shadow-2xl z-50 no-print">
