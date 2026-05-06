@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>申堡營運中樞系統 - 旗艦整合版 v6.4</title>
+    <title>申堡營運中樞系統 - 旗艦整合版 v7.0</title>
     
     <!-- 核心套件導入 -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -15,11 +15,7 @@
     <style>
         body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; -webkit-tap-highlight-color: transparent; }
         @keyframes slideIn { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes pulse-status { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
         .animate-slide-in { animation: slideIn 0.3s ease-out forwards; }
-        .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
-        .status-breathing { animation: pulse-status 2s infinite ease-in-out; }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
         
@@ -31,33 +27,18 @@
             th, td { border: 1px solid black !important; padding: 8px !important; }
             @page { margin: 15mm; size: A4 portrait; }
         }
+
+        .btn-primary { @apply bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg hover:bg-indigo-700 active:scale-95 transition-all; }
+        .input-standard { @apply w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-indigo-500 focus:bg-white transition-all font-bold; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
     <div id="root"></div>
 
-    <!-- Firebase 核心引擎 (Cloud Firestore) -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'shenbao-furniture-v6';
-
-        // 封裝工具以供 React 使用
-        window.FB_API = { 
-            db, auth, appId, collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocs,
-            signInAnonymously, signInWithCustomToken, onAuthStateChanged 
-        };
-    </script>
-
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
+        // --- 核心工具 ---
         const generateId = (prefix = '') => prefix + Math.random().toString(36).substr(2, 6).toUpperCase();
         const getToday = () => new Date().toISOString().split('T')[0];
         
@@ -74,310 +55,342 @@
             return (s.replace(/(零.)*零元/, '元').replace(/(零.)+/g, '零') || '零元') + '整';
         };
 
-        function App() {
-            // --- 驗證與連線狀態 ---
-            const [isLoggedIn, setIsLoggedIn] = useState(false);
-            const [loginForm, setLoginForm] = useState({ username: '', password: '' });
-            const [loginError, setLoginError] = useState('');
-            const [user, setUser] = useState(null);
-            const [syncStatus, setSyncStatus] = useState('connecting'); // connecting, synced, empty, error
+        // 固定數據金鑰，確保不因版本號更新而流失資料
+        const STORAGE_KEY = 'SHENBAO_V7_MASTER_DATA';
 
-            // --- UI 狀態 ---
+        function App() {
             const [activeTab, setActiveTab] = useState('dashboard');
             const [toast, showToast] = useState(null);
             const [printDoc, setPrintDoc] = useState(null);
 
-            // --- 雲端數據實體 ---
-            const [products, setProducts] = useState([]);
-            const [quotes, setQuotes] = useState([]);
-            const [orders, setOrders] = useState([]);
-            const [invoices, setInvoices] = useState([]);
-            const [inputInvoices, setInputInvoices] = useState([]);
+            // --- 全局狀態管理 ---
+            const [data, setData] = useState(() => {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                return saved ? JSON.parse(saved) : {
+                    products: [],
+                    quotes: [],
+                    orders: [],
+                    invoices: [],
+                    inputInvoices: [],
+                    logistics: []
+                };
+            });
+
+            // 自動存檔
+            useEffect(() => {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            }, [data]);
 
             const triggerToast = (m) => { showToast(m); setTimeout(() => showToast(null), 3000); };
 
-            // 1. Firebase 授權連線
-            useEffect(() => {
-                if (!window.FB_API) return;
-                const { auth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } = window.FB_API;
+            // ==========================================
+            // ⭐️ 系統管理 (備份/還原)
+            // ==========================================
+            const handleExport = () => {
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `申堡數據備份_${getToday()}.json`;
+                a.click();
+                triggerToast("備份檔已下載");
+            };
 
-                const startAuth = async () => {
+            const handleImport = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
                     try {
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await signInWithCustomToken(auth, __initial_auth_token);
+                        const imported = JSON.parse(ev.target.result);
+                        if (imported.products) {
+                            setData(imported);
+                            triggerToast("系統資料已成功還原");
                         } else {
-                            await signInAnonymously(auth);
+                            triggerToast("格式不符，請使用正確的備份檔");
                         }
-                    } catch (err) { setSyncStatus('error'); }
+                    } catch (err) { triggerToast("檔案解析失敗"); }
                 };
-                startAuth();
-                return onAuthStateChanged(auth, setUser);
-            }, []);
-
-            // 2. 雲端同步監聽 (強化診斷邏輯)
-            useEffect(() => {
-                if (!user || !window.FB_API) return;
-                const { db, appId, collection, onSnapshot } = window.FB_API;
-
-                const createListener = (colName, setter) => {
-                    const ref = collection(db, 'artifacts', appId, 'public', 'data', colName);
-                    return onSnapshot(ref, (snap) => {
-                        setter(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-                        // 只要有回應，即視為同步成功
-                        setSyncStatus('synced');
-                    }, (err) => {
-                        console.error(`Firebase Sync Error [${colName}]:`, err);
-                        setSyncStatus('error');
-                    });
-                };
-
-                const unsubP = createListener('products', setProducts);
-                const unsubQ = createListener('quotes', setQuotes);
-                const unsubO = createListener('orders', setOrders);
-                const unsubI = createListener('invoices', setInvoices);
-                const unsubInp = createListener('inputInvoices', setInputInvoices);
-
-                return () => { unsubP(); unsubQ(); unsubO(); unsubI(); unsubInp(); };
-            }, [user]);
-
-            // --- 登入邏輯 ---
-            const handleLogin = (e) => {
-                e.preventDefault();
-                if (loginForm.username === 'admin' && loginForm.password === '87739223') {
-                    setIsLoggedIn(true);
-                    triggerToast("雲端資產授權成功");
-                } else {
-                    setLoginError('驗證失敗：帳號或密碼錯誤');
-                }
+                reader.readAsText(file);
+                e.target.value = '';
             };
 
             // ==========================================
-            // ⭐️ 核心雲端操作
-            // ==========================================
-            const cloudSave = async (colName, data, customId = null) => {
-                if (!window.FB_API || !user) return;
-                const { db, appId, doc, setDoc } = window.FB_API;
-                const finalId = customId || data.id || generateId(colName[0].toUpperCase());
-                const ref = doc(db, 'artifacts', appId, 'public', 'data', colName, finalId);
-                await setDoc(ref, { ...data, id: finalId });
-                return finalId;
-            };
-
-            const cloudDelete = async (colName, id) => {
-                if (!window.FB_API || !user) return;
-                const { db, appId, doc, deleteDoc } = window.FB_API;
-                const ref = doc(db, 'artifacts', appId, 'public', 'data', colName, id);
-                await deleteDoc(ref);
-            };
-
-            // 遷移本地舊資料到雲端
-            const migrateLocalStorage = async () => {
-                const oldData = JSON.parse(localStorage.getItem('sb_p_v6_0') || '[]');
-                if (oldData.length === 0) return triggerToast("本地暫存中無可遷移的舊資料");
-                
-                let count = 0;
-                for (const item of oldData) {
-                    await cloudSave('products', item, item.id);
-                    count++;
-                }
-                triggerToast(`成功遷移 ${count} 筆商品至雲端！`);
-            };
-
-            // ==========================================
-            // ⭐️ 商品庫操作
+            // ⭐️ 商品資料庫
             // ==========================================
             const [pSearch, setPSearch] = useState('');
             const [pEdit, setPEdit] = useState(null);
             const [pForm, setPForm] = useState({ id: '', supplier: '', name: '', specs: '', unitPrice: 0 });
 
-            const handleProductSubmit = async () => {
-                if (!pForm.name) return triggerToast("請填寫品名");
-                await cloudSave('products', pForm);
+            const handleProductSave = () => {
+                if (!pForm.name) return triggerToast("請輸入品名");
+                const newList = pEdit === 'new' 
+                    ? [{ ...pForm, id: pForm.id || generateId('P') }, ...data.products]
+                    : data.products.map(p => p.id === pForm.id ? pForm : p);
+                
+                setData({ ...data, products: newList });
                 setPEdit(null);
-                triggerToast("雲端商品同步完成");
+                triggerToast("商品資料已儲存");
+            };
+
+            const handleProductDelete = (id) => {
+                if (!window.confirm("確定要刪除此商品嗎？")) return;
+                setData({ ...data, products: data.products.filter(p => p.id !== id) });
+                triggerToast("商品已移除");
             };
 
             // ==========================================
-            // ⭐️ 視圖渲染
+            // ⭐️ 報價單系統
             // ==========================================
-            if (!isLoggedIn) {
+            const [qView, setQView] = useState('list');
+            const [qForm, setQForm] = useState({ client: '', date: getToday(), items: [], total: 0 });
+            const [qSelSku, setQSelSku] = useState('');
+            const [qSelQty, setQSelQty] = useState(1);
+
+            const handleAddQItem = () => {
+                const p = data.products.find(x => x.id === qSelSku);
+                if (!p) return;
+                setQForm({ 
+                    ...qForm, 
+                    items: [...qForm.items, { ...p, qty: qSelQty }], 
+                    total: qForm.total + (p.unitPrice * qSelQty) 
+                });
+                setQSelSku(''); setQSelQty(1);
+            };
+
+            const saveQuote = () => {
+                if (!qForm.client || qForm.items.length === 0) return triggerToast("資料不完整");
+                setData({ ...data, quotes: [{ ...qForm, id: generateId('Q') }, ...data.quotes] });
+                setQView('list');
+                triggerToast("報價單已存檔");
+            };
+
+            // ==========================================
+            // ⭐️ 財務系統 (二三聯邏輯 & 號碼檢查)
+            // ==========================================
+            const [invMode, setInvMode] = useState('銷項'); 
+            const [invForm, setInvForm] = useState({ 
+                category: '三聯式', taxId: '', invNum: '', client: '', totalAmount: 0, date: getToday() 
+            });
+
+            const handleInvoiceSave = () => {
+                if (!invForm.client || invForm.totalAmount <= 0) return triggerToast("請填寫完整資訊");
+                
+                // 1. 三聯式統編校驗
+                if (invForm.category === '三聯式' && !/^\d{8}$/.test(invForm.taxId)) {
+                    return triggerToast("三聯式發票必須輸入 8 位統一編號");
+                }
+                
+                // 2. 發票號碼格式校驗
+                const invPattern = /^[A-Z]{2}-\d{8}$/;
+                if (invForm.invNum && !invPattern.test(invForm.invNum)) {
+                    return triggerToast("發票號碼格式錯誤！範例：AB-12345678");
+                }
+
+                const col = invMode === '銷項' ? 'invoices' : 'inputInvoices';
+                setData({ ...data, [col]: [{ ...invForm, id: generateId('INV') }, ...data[col]] });
+                setInvForm({ category: '三聯式', taxId: '', invNum: '', client: '', totalAmount: 0, date: getToday() });
+                triggerToast(`${invMode}發票紀錄已建立`);
+            };
+
+            // ==========================================
+            // ⭐️ 列印引擎
+            // ==========================================
+            if (printDoc) {
+                const d = printDoc.data;
+                const isPO = printDoc.type === 'order';
                 return (
-                    <div className="min-h-screen w-full flex items-center justify-center bg-slate-900 relative font-sans overflow-hidden">
-                        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/20 blur-[120px] rounded-full"></div>
-                        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-600/10 blur-[120px] rounded-full"></div>
-                        <div className="bg-white/95 backdrop-blur-xl p-16 rounded-[4rem] shadow-2xl w-full max-w-lg z-10 animate-fade-in text-center border border-white/20">
-                            <div className="mb-12">
-                                <h1 className="text-4xl font-black text-slate-900 italic tracking-tighter mb-2 uppercase">SHENBAO HUB</h1>
-                                <p className="text-slate-400 font-bold uppercase tracking-[0.4em] text-[10px]">申堡營運管理中樞 v6.4 Cloud Diagnostic</p>
-                            </div>
-                            <form onSubmit={handleLogin} className="space-y-8">
-                                <div className="space-y-2 text-left">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">帳號</label>
-                                    <input type="text" value={loginForm.username} onChange={e=>setLoginForm({...loginForm, username:e.target.value})} className="w-full px-8 py-5 bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-[2rem] outline-none font-bold text-lg transition-all" required />
-                                </div>
-                                <div className="space-y-2 text-left">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">密碼</label>
-                                    <input type="password" value={loginForm.password} onChange={e=>setLoginForm({...loginForm, password:e.target.value})} className="w-full px-8 py-5 bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-[2rem] outline-none font-bold text-lg transition-all" required />
-                                </div>
-                                {loginError && <div className="text-red-500 text-sm font-bold bg-red-50 p-4 rounded-2xl">{loginError}</div>}
-                                <button type="submit" className="w-full py-6 bg-indigo-600 text-white rounded-[2.5rem] font-black text-xl shadow-xl hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2">進入診斷模式 <i className="ph ph-activity"></i></button>
-                            </form>
+                    <div className="bg-white text-black min-h-screen p-12 font-serif print-container">
+                        <div className="no-print mb-10 flex gap-4"><button onClick={()=>window.print()} className="bg-indigo-600 text-white px-8 py-2 rounded-xl font-bold shadow-lg">確認列印</button><button onClick={()=>setPrintDoc(null)} className="bg-slate-100 px-8 py-2 rounded-xl font-bold border">取消</button></div>
+                        <h1 className="text-center text-5xl font-bold tracking-[0.8em] border-b-8 border-black pb-6 mb-8 uppercase italic">{isPO ? '採購單' : '估價單'}</h1>
+                        <div className="flex justify-between mb-8 text-2xl font-bold">
+                            <div className="underline decoration-4 underline-offset-8 leading-loose">{d.client || d.supplier} 台照</div>
+                            <div className="text-right font-mono text-lg">日期：{d.date} <br/> 單號：{d.id}</div>
                         </div>
+                        <table className="w-full border-collapse border-[2px] border-black text-center">
+                            <thead><tr className="bg-slate-50 font-black text-xl"><th className="p-4 border-r border-black">品名規格</th><th className="p-4 border-r border-black w-24">數量</th>{!isPO && <><th className="p-4 border-r border-black w-32">單價</th><th className="p-4 w-40">小計</th></>}</tr></thead>
+                            <tbody>
+                                {d.items.map((it, i) => (
+                                    <tr key={i} className="text-xl h-14 border-b border-black font-bold">
+                                        <td className="p-4 border-r border-black text-left">{it.name} <div className="text-sm font-normal">{it.specs}</div></td>
+                                        <td className="p-4 border-r border-black">{it.qty}</td>
+                                        {!isPO && <><td className="p-4 border-r border-black text-right">{it.unitPrice?.toLocaleString()}</td><td className="p-4 text-right">{(it.qty * it.unitPrice).toLocaleString()}</td></>}
+                                    </tr>
+                                ))}
+                            </tbody>
+                            {!isPO && <tfoot><tr className="bg-slate-100 font-black text-2xl border-t-2 border-black"><td colSpan="3" className="p-6 border-r border-black text-left">總計：{numberToChinese(d.total)}</td><td className="p-6 text-right">${d.total?.toLocaleString()}</td></tr></tfoot>}
+                        </table>
                     </div>
                 );
             }
 
-            if (printDoc) {
-                // 列印邏輯...
-                return <div className="p-10">單據列印預覽... <button onClick={()=>setPrintDoc(null)}>返回</button></div>;
-            }
-
             return (
-                <div className="flex h-screen w-full bg-slate-50 overflow-hidden relative font-sans">
+                <div className="flex h-screen w-full bg-slate-50 overflow-hidden relative">
                     {/* 側邊導覽 */}
-                    <aside className="w-72 bg-slate-900 h-full text-white flex flex-col shrink-0 z-20 shadow-2xl relative">
-                        <div className="p-10 border-b border-slate-800 flex flex-col gap-4">
-                            <h1 className="text-2xl font-black italic text-blue-400 leading-none">SHENBAO <span className="text-[10px] bg-emerald-500 text-white px-2 py-0.5 rounded ml-1 font-bold">Cloud</span></h1>
-                            
-                            {/* 智慧連線診斷燈 */}
-                            <div className="bg-slate-800/80 p-4 rounded-3xl border border-white/5 space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[9px] font-black uppercase text-slate-500 tracking-widest">系統連線狀態</span>
-                                    <div className={`w-2.5 h-2.5 rounded-full ${syncStatus==='synced'?'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]':syncStatus==='error'?'bg-red-500':'bg-amber-500 status-breathing'}`}></div>
-                                </div>
-                                <div className="text-[11px] font-bold text-slate-300">
-                                    {syncStatus === 'synced' ? '✅ 雲端資料庫聯動中' : syncStatus === 'error' ? '❌ 連線中斷' : '⌛ 正在同步雲端資產...'}
-                                </div>
-                            </div>
-                        </div>
+                    <aside className="w-72 bg-slate-900 h-full text-white flex flex-col shrink-0 z-20 shadow-2xl">
+                        <div className="p-10 border-b border-slate-800"><h1 className="text-2xl font-black italic text-blue-400">SHENBAO <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded ml-1 tracking-normal font-bold">v7.0</span></h1></div>
                         <nav className="flex-1 p-6 space-y-2 overflow-y-auto custom-scrollbar">
                             {[
-                                {id:'dashboard', n:'儀表板', i:'ph-layout'}, {id:'products', n:'庫存資料庫', i:'ph-package'}, {id:'quotations', n:'報價單系統', i:'ph-file-text'},
-                                {id:'invoices', n:'財務發票', i:'ph-receipt'}
-                            ].map(t => (
-                                <button key={t.id} onClick={() => setActiveTab(t.id)} className={`w-full text-left px-8 py-4 rounded-[2rem] font-bold transition-all text-xs tracking-widest uppercase ${activeTab === t.id ? 'bg-indigo-600 text-white shadow-xl scale-105' : 'text-slate-500 hover:text-slate-200 hover:bg-slate-800'}`}>
-                                    <i className={`ph ${t.i} mr-3 text-lg align-middle`}></i> {t.n}
+                                { id: 'dashboard', name: '首頁儀表板', icon: 'ph-layout' },
+                                { id: 'products', name: '商品資料庫', icon: 'ph-package' },
+                                { id: 'quotations', name: '報價單系統', icon: 'ph-file-text' },
+                                { id: 'invoices', name: '財務與稅務', icon: 'ph-receipt' }
+                            ].map(item => (
+                                <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full text-left px-8 py-4 rounded-[2rem] font-bold transition-all text-xs tracking-widest uppercase ${activeTab === item.id ? 'bg-indigo-600 text-white shadow-xl scale-105' : 'text-slate-500 hover:text-slate-200 hover:bg-slate-800'}`}>
+                                    <i className={`ph ${item.icon} mr-3 text-lg align-middle`}></i> {item.name}
                                 </button>
                             ))}
                         </nav>
-                        <div className="p-8 border-t border-slate-800">
-                            <button onClick={()=>setIsLoggedIn(false)} className="w-full py-4 bg-red-500/10 text-red-400 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white transition-all"><i className="ph ph-power"></i> 安全登出系統</button>
-                        </div>
+                        <div className="p-8 border-t border-slate-800"><div className="flex items-center gap-4"><div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center font-black">莊</div><div><div className="text-sm font-bold leading-none">莊惠呅</div><div className="text-[10px] text-slate-500 font-bold mt-1 uppercase">Administrator</div></div></div></div>
                     </aside>
 
                     {/* 主顯示區 */}
                     <main className="flex-1 h-full overflow-y-auto p-12 bg-slate-50/50 custom-scrollbar relative">
                         {toast && <div className="fixed top-12 right-12 bg-slate-900 text-white px-10 py-5 rounded-[2rem] shadow-2xl z-50 font-black animate-slide-in flex items-center gap-3 border border-white/10"><i className="ph ph-check-circle text-emerald-400 text-xl"></i> {toast}</div>}
 
-                        {/* 儀表板：數據路徑與資產概況 */}
+                        {/* 1. 儀表板 */}
                         {activeTab === 'dashboard' && (
-                            <div className="max-w-6xl mx-auto space-y-12 py-10 animate-slide-in">
-                                <div className="space-y-4 text-center">
-                                    <h1 className="text-6xl font-black text-slate-900 italic tracking-tighter uppercase leading-none">申堡營運管理中樞</h1>
-                                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-full text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                        <i className="ph ph-cloud-check text-emerald-500 text-base"></i> 
-                                        雲端儲存路徑：/artifacts/{window.FB_API?.appId || 'shenbao-v6'}/public/data
-                                    </div>
-                                </div>
+                            <div className="max-w-6xl mx-auto space-y-12 py-10 text-center animate-slide-in">
+                                <h1 className="text-7xl font-black text-slate-900 italic tracking-tighter uppercase mb-2">申堡營運管理中樞</h1>
+                                <p className="text-slate-400 font-black text-sm tracking-[0.4em] mb-12 uppercase">Data Ownership & Asset Protection</p>
+                                
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                    <div className="bg-white p-10 rounded-[3.5rem] border shadow-sm border-slate-100">
-                                        <div className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">雲端商品總數</div>
-                                        <div className="flex items-baseline gap-2">
-                                            <div className="text-6xl font-black text-indigo-600 font-mono">{products.length}</div>
-                                            <div className="text-slate-300 font-bold">SKUs</div>
-                                        </div>
-                                    </div>
-                                    <div className="bg-white p-10 rounded-[3.5rem] border shadow-sm border-slate-100">
-                                        <div className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">雲端報價單</div>
-                                        <div className="flex items-baseline gap-2">
-                                            <div className="text-6xl font-black text-emerald-600 font-mono">{quotes.length}</div>
-                                            <div className="text-slate-300 font-bold">Files</div>
-                                        </div>
-                                    </div>
-                                    <div className="bg-white p-10 rounded-[3.5rem] border shadow-sm border-slate-100">
-                                        <div className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">雲端帳務紀錄</div>
-                                        <div className="flex items-baseline gap-2">
-                                            <div className="text-6xl font-black text-amber-500 font-mono">{invoices.length + inputInvoices.length}</div>
-                                            <div className="text-slate-300 font-bold">Logs</div>
-                                        </div>
-                                    </div>
+                                    <div className="bg-white p-10 rounded-[3.5rem] border shadow-sm"><div className="text-6xl font-black text-indigo-600 mb-2 font-mono">{data.products.length}</div><div className="text-xs font-black text-slate-400 tracking-widest uppercase">商品品項總數</div></div>
+                                    <div className="bg-white p-10 rounded-[3.5rem] border shadow-sm"><div className="text-6xl font-black text-emerald-600 mb-2 font-mono">{data.quotes.length}</div><div className="text-xs font-black text-slate-400 tracking-widest uppercase">累計報價單</div></div>
+                                    <div className="bg-white p-10 rounded-[3.5rem] border shadow-sm"><div className="text-6xl font-black text-amber-500 mb-2 font-mono">{data.invoices.length}</div><div className="text-xs font-black text-slate-400 tracking-widest uppercase">銷項發票數</div></div>
                                 </div>
-                                <div className="p-12 bg-slate-900 rounded-[4rem] text-white flex justify-between items-center relative overflow-hidden group">
-                                    <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/10 rounded-full -mr-40 -mt-40 blur-3xl group-hover:bg-blue-500/20 transition-all"></div>
-                                    <div className="z-10">
-                                        <h3 className="text-3xl font-black mb-2 flex items-center gap-3 italic uppercase"><i className="ph ph-shield-check text-blue-400"></i> 資產數據永續保護</h3>
-                                        <p className="text-slate-400 font-medium">您的資料已加密存放於分散式伺服器，更換設備登入亦可完整取回。</p>
+
+                                <div className="bg-slate-900 text-white p-16 rounded-[4rem] flex flex-col md:flex-row items-center justify-between gap-10 shadow-2xl">
+                                    <div className="text-left"><h3 className="text-4xl font-black mb-2 flex items-center gap-4 italic uppercase"><i className="ph ph-shield-check text-blue-400"></i> 在地數據保險箱</h3><p className="text-slate-400 font-bold">為避免電腦故障或更換裝置，請定期下載備份存檔。</p></div>
+                                    <div className="flex gap-4">
+                                        <button onClick={handleExport} className="bg-indigo-600 px-10 py-5 rounded-[2rem] font-black hover:bg-indigo-700 transition shadow-lg flex items-center gap-2"><i className="ph ph-download-simple"></i> 下載備份</button>
+                                        <button onClick={()=>document.getElementById('importFile').click()} className="bg-white text-slate-900 px-10 py-5 rounded-[2rem] font-black hover:bg-slate-100 transition shadow-lg flex items-center gap-2"><i className="ph ph-upload-simple"></i> 還原數據</button>
+                                        <input id="importFile" type="file" className="hidden" onChange={handleImport} />
                                     </div>
-                                    <button onClick={migrateLocalStorage} className="bg-white text-slate-900 px-10 py-5 rounded-3xl font-black shadow-xl hover:scale-105 active:scale-95 transition-all z-10 flex items-center gap-2">
-                                        <i className="ph ph-copy"></i> 同步本地舊資料
-                                    </button>
                                 </div>
                             </div>
                         )}
 
-                        {/* 商品資料庫 */}
+                        {/* 2. 商品資料庫 */}
                         {activeTab === 'products' && (
                             <div className="animate-slide-in space-y-10 max-w-7xl mx-auto pb-20">
                                 <div className="flex justify-between items-end">
-                                    <div><h2 className="text-5xl font-black text-slate-800 italic uppercase tracking-tighter">商品資料庫</h2><p className="text-[10px] font-black text-slate-400 tracking-[0.4em] mt-1 uppercase underline decoration-indigo-200 decoration-2 underline-offset-4">Cloud Protected Master Assets</p></div>
-                                    <button onClick={()=>{setPForm({id:'', supplier:'', name:'', specs:'', unitPrice:0}); setPEdit('new')}} className="bg-indigo-600 text-white px-10 py-5 rounded-3xl font-black shadow-xl hover:scale-105 transition-all">+ 新增雲端項目</button>
+                                    <div><h2 className="text-5xl font-black text-slate-800 italic uppercase tracking-tighter">商品資料庫</h2><p className="text-[10px] font-black text-slate-400 tracking-[0.4em] mt-1 uppercase">Inventory Master Database</p></div>
+                                    <button onClick={()=>{setPForm({id:'', supplier:'', name:'', specs:'', unitPrice:0}); setPEdit('new')}} className="btn-primary">+ 新增產品品項</button>
                                 </div>
-                                <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 flex gap-4"><input type="text" placeholder="搜尋雲端資料庫中的 SKU 或品名..." value={pSearch} onChange={e=>setPSearch(e.target.value)} className="w-full px-10 py-6 bg-slate-50 border-transparent rounded-[2rem] outline-none font-black text-2xl placeholder:text-slate-200" /></div>
-                                <div className="bg-white rounded-[4rem] border border-slate-100 shadow-xl overflow-hidden relative">
-                                    {syncStatus === 'connecting' && <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-10 flex items-center justify-center font-black text-indigo-600 gap-3 animate-fade-in"><i className="ph ph-circle-notch animate-spin text-4xl"></i> 正在抓取雲端資產...</div>}
+                                <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100"><input type="text" placeholder="搜尋 SKU 編號或品名關鍵字..." value={pSearch} onChange={e=>setPSearch(e.target.value)} className="w-full px-10 py-6 bg-slate-50 border-transparent rounded-[2rem] outline-none font-black text-2xl" /></div>
+                                <div className="bg-white rounded-[4rem] border shadow-xl overflow-hidden">
                                     <table className="w-full text-left">
-                                        <thead className="bg-slate-50/80 border-b font-black text-slate-400 uppercase tracking-widest text-[11px]"><th className="p-10 w-48">編號 / 廠牌</th><th className="p-10">品名規格內容 (雲端同步)</th><th className="p-10 text-right w-64">建議單價</th><th className="p-10 text-center w-40">管理</th></thead>
+                                        <thead className="bg-slate-50 border-b font-black text-slate-400 uppercase tracking-widest text-[11px]"><th className="p-10 w-48">編號 / 廠牌</th><th className="p-10">品名規格內容 (可完整閱讀)</th><th className="p-10 text-right w-64">建議單價</th><th className="p-10 text-center w-48">管理操作</th></thead>
                                         <tbody>
-                                            {products.filter(p => p.name.toLowerCase().includes(pSearch.toLowerCase()) || p.id.toLowerCase().includes(pSearch.toLowerCase())).map(p => (
+                                            {data.products.filter(p => p.name.toLowerCase().includes(pSearch.toLowerCase()) || p.id.toLowerCase().includes(pSearch.toLowerCase())).map(p => (
                                                 <tr key={p.id} className="border-b hover:bg-indigo-50/30 transition-all group">
-                                                    <td className="p-10 align-top">
-                                                        <div className="inline-block px-3 py-1 bg-slate-100 text-slate-500 rounded-lg font-mono text-xs font-bold mb-2 uppercase">{p.id}</div>
-                                                        <div className="text-indigo-600 font-black text-lg uppercase tracking-tight leading-none">{p.supplier || '一般'}</div>
-                                                    </td>
-                                                    <td className="p-10 align-top">
-                                                        <div className="text-slate-900 font-bold text-2xl leading-snug mb-2">{p.name}</div>
-                                                        <div className="text-slate-600 font-medium text-base bg-slate-50 p-4 rounded-2xl border border-slate-100 inline-block min-w-[200px]">{p.specs}</div>
-                                                    </td>
-                                                    <td className="p-10 text-right align-top">
-                                                        <div className="font-mono font-black text-4xl text-emerald-700 tracking-tighter">${p.unitPrice?.toLocaleString()}</div>
-                                                    </td>
-                                                    <td className="p-10 text-center align-middle space-x-3">
-                                                        <button onClick={()=>{setPForm(p); setPEdit('edit')}} className="p-5 bg-white border border-slate-100 text-slate-400 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm"><i className="ph ph-pencil-simple text-2xl"></i></button>
-                                                        <button onClick={()=>cloudDelete('products', p.id)} className="p-5 bg-white border border-slate-100 text-red-200 rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-sm"><i className="ph ph-trash text-2xl"></i></button>
-                                                    </td>
+                                                    <td className="p-10 align-top"><div className="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg font-mono text-xs font-bold inline-block mb-1">{p.id}</div><div className="text-indigo-600 font-black text-lg uppercase leading-none">{p.supplier || '一般'}</div></td>
+                                                    <td className="p-10 align-top"><div className="text-slate-900 font-bold text-2xl leading-snug mb-2">{p.name}</div><div className="text-slate-600 font-medium text-base leading-relaxed bg-slate-50 p-4 rounded-2xl border border-slate-100 whitespace-pre-wrap">{p.specs || '未填寫規格細節'}</div></td>
+                                                    <td className="p-10 text-right align-top"><div className="font-mono font-black text-4xl text-emerald-700 tracking-tighter">${p.unitPrice?.toLocaleString()}</div></td>
+                                                    <td className="p-10 text-center align-middle space-x-3"><button onClick={()=>{setPForm(p); setPEdit('edit')}} className="p-5 bg-white border border-slate-100 text-slate-400 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm"><i className="ph ph-pencil-simple text-2xl"></i></button><button onClick={()=>handleProductDelete(p.id)} className="p-5 bg-white border border-slate-100 text-red-200 rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-sm"><i className="ph ph-trash text-2xl"></i></button></td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
-                                    {products.length === 0 && syncStatus === 'synced' && (
-                                        <div className="p-40 text-center animate-fade-in space-y-6">
-                                            <div className="text-8xl">☁️</div>
-                                            <h3 className="text-3xl font-black text-slate-300 italic uppercase">您的雲端空間目前是空的</h3>
-                                            <p className="text-slate-400 font-bold max-w-sm mx-auto">這代表您已經成功連上雲端資料庫。請開始新增您的第一個商品，資料將永久留存在 Google 伺服器。</p>
-                                            <button onClick={()=>{setPForm({id:'', supplier:'', name:'', specs:'', unitPrice:0}); setPEdit('new')}} className="bg-indigo-600 text-white px-12 py-5 rounded-3xl font-black shadow-xl">立即新增雲端首筆商品</button>
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         )}
 
-                        {/* 其他模組結構... */}
-                        {activeTab === 'quotations' && <div className="p-20 text-center font-black text-slate-300 italic uppercase text-4xl animate-slide-in">雲端報價單同步通道正常</div>}
-                        {activeTab === 'invoices' && <div className="p-20 text-center font-black text-slate-300 italic uppercase text-4xl animate-slide-in">雲端財務帳目聯動正常</div>}
+                        {/* 3. 報價單系統 */}
+                        {activeTab === 'quotations' && (
+                            <div className="animate-slide-in space-y-10 max-w-7xl mx-auto pb-20">
+                                <div className="flex justify-between items-end">
+                                    <h2 className="text-5xl font-black text-slate-800 italic uppercase tracking-tighter">報價控制中樞</h2>
+                                    {qView === 'list' && <button onClick={()=>{setQForm({client:'', date:getToday(), items:[], total:0}); setQView('create')}} className="btn-primary">+ 建立新報價單</button>}
+                                </div>
+                                {qView === 'create' ? (
+                                    <div className="bg-white p-16 rounded-[5rem] shadow-sm border border-slate-100 space-y-12 max-w-5xl mx-auto">
+                                        <div className="grid grid-cols-2 gap-10">
+                                            <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">客戶買受人抬頭</label><input type="text" value={qForm.client} onChange={e=>setQForm({...qForm, client:e.target.value})} className="input-standard" /></div>
+                                            <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">日期</label><input type="date" value={qForm.date} onChange={e=>setQForm({...qForm, date:e.target.value})} className="input-standard" /></div>
+                                        </div>
+                                        <div className="bg-slate-50 p-10 rounded-[4rem] border-4 border-dashed border-slate-200 flex gap-6 items-end">
+                                            <div className="flex-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">選取產品</label><select value={qSelSku} onChange={e=>setQSelSku(e.target.value)} className="input-standard bg-white shadow-sm"><option value="">-- 請選取商品 --</option>{data.products.map(p => <option key={p.id} value={p.id}>[{p.supplier}] {p.name}</option>)}</select></div>
+                                            <div className="w-32"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block text-center">數量</label><input type="number" value={qSelQty} onChange={e=>setQSelQty(Number(e.target.value))} className="input-standard text-center" /></div>
+                                            <button onClick={handleAddQItem} className="bg-slate-900 text-white px-10 py-5 rounded-3xl font-black shadow-lg">加入明細</button>
+                                        </div>
+                                        <div className="space-y-4">{qForm.items.map((it, i) => (<div key={i} className="flex justify-between items-center p-8 bg-white border rounded-3xl font-black shadow-sm group"><span>{it.name}<span className="text-slate-400 font-normal text-sm ml-4 block mt-1">{it.specs}</span></span><span className="text-indigo-600 text-2xl">x{it.qty} / ${(it.qty * it.unitPrice).toLocaleString()}</span></div>))}</div>
+                                        <div className="bg-slate-900 text-white p-14 rounded-[4rem] flex justify-between items-end relative overflow-hidden group">
+                                            <div className="z-10">
+                                                <div className="text-[10px] opacity-30 uppercase tracking-widest mb-2 font-black">中文大寫預覽</div>
+                                                <div className="text-3xl font-black text-indigo-300">{numberToChinese(qForm.total)}</div>
+                                            </div>
+                                            <div className="text-right z-10"><div className="text-8xl font-black font-mono text-emerald-400 mb-8 tracking-tighter">${qForm.total.toLocaleString()}</div><div className="flex gap-4"><button onClick={saveQuote} className="bg-emerald-600 px-12 py-5 rounded-[2.5rem] font-black text-xl shadow-xl hover:bg-emerald-700 transition-all">確認儲存</button><button onClick={()=>setQView('list')} className="bg-white/10 px-12 py-5 rounded-[2.5rem] font-black text-xl hover:bg-white/20 transition-all">取消</button></div></div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="bg-white rounded-[4rem] border shadow-xl overflow-hidden">
+                                        <table className="w-full text-left">
+                                            <thead className="bg-slate-50 border-b font-black text-slate-400 uppercase tracking-widest text-[10px]"><th className="p-10 w-1/4">編號 / 日期</th><th className="p-10 w-1/2">買受人資訊</th><th className="p-10 text-right w-1/4">報價金額</th><th className="p-10 text-center w-40">列印</th></thead>
+                                            <tbody>{data.quotes.map(q => (<tr key={q.id} className="border-b hover:bg-slate-50 transition-colors"><td className="p-10 font-mono text-sm text-slate-400">{q.id}<div className="font-bold text-slate-800 mt-2 text-base">{q.date}</div></td><td className="p-10 font-black text-slate-800 text-2xl truncate">{q.client}</td><td className="p-10 text-right font-black text-indigo-600 text-3xl font-mono">${q.total?.toLocaleString()}</td><td className="p-10 text-center"><button onClick={()=>setPrintDoc({type:'quote', data:q})} className="p-5 bg-slate-50 text-indigo-600 rounded-3xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm"><i className="ph ph-printer text-3xl"></i></button></td></tr>))}</tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* 4. 財務系統 */}
+                        {activeTab === 'invoices' && (
+                            <div className="animate-slide-in space-y-10 max-w-5xl mx-auto pb-40">
+                                <div className="flex justify-between items-end">
+                                    <h2 className="text-5xl font-black text-slate-800 italic uppercase tracking-tighter">財務報表看板</h2>
+                                    <div className="flex bg-slate-200 p-2 rounded-3xl gap-2 font-black shadow-inner">
+                                        <button onClick={()=>setInvMode('銷項')} className={`px-8 py-3 rounded-2xl transition-all ${invMode==='銷項'?'bg-white text-indigo-600 shadow-md':'text-slate-500'}`}>銷項紀錄</button>
+                                        <button onClick={()=>setInvMode('進項')} className={`px-8 py-3 rounded-2xl transition-all ${invMode==='進項'?'bg-white text-red-600 shadow-md':'text-slate-500'}`}>進項支出</button>
+                                    </div>
+                                </div>
+                                <div className="bg-white p-16 rounded-[5rem] shadow-sm border border-slate-100 space-y-12">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">發票類型</label>
+                                            <select value={invForm.category} onChange={e=>setInvForm({...invForm, category:e.target.value})} className="input-standard shadow-inner">
+                                                <option>三聯式</option><option>二聯式</option><option>收據/領據</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">發票號碼 (範例：AB-12345678)</label>
+                                            <input type="text" placeholder="大寫英文-8位數字" value={invForm.invNum} onChange={e=>setInvForm({...invForm, invNum:e.target.value.toUpperCase()})} className="input-standard font-mono text-3xl shadow-inner uppercase" />
+                                        </div>
+                                        {/* 三聯式才顯示統編欄位 */}
+                                        {invForm.category === '三聯式' && (
+                                            <div className="space-y-2 col-span-full animate-slide-in">
+                                                <label className="text-[10px] font-black text-red-500 uppercase tracking-widest">統一編號 (必填 8 碼)</label>
+                                                <input type="text" maxLength={8} value={invForm.taxId} onChange={e=>setInvForm({...invForm, taxId:e.target.value.replace(/\D/g,'')})} className="input-standard font-mono text-4xl tracking-[0.5em] bg-red-50/10 border-red-50 focus:bg-white shadow-inner" />
+                                            </div>
+                                        )}
+                                        <div className="space-y-2 col-span-full"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{invMode==='銷項'?'買受人名稱':'支出對象名稱'}</label><input type="text" value={invForm.client} onChange={e=>setInvForm({...invForm, client:e.target.value})} className="input-standard" /></div>
+                                        <div className="space-y-2 col-span-full"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">含稅總計金額</label><input type="number" value={invForm.totalAmount} onChange={e=>setInvForm({...invForm, totalAmount:Number(e.target.value)})} className={`input-standard font-mono text-5xl ${invMode==='銷項'?'text-emerald-600 focus:border-emerald-500':'text-red-600 focus:border-red-500'}`} /></div>
+                                    </div>
+                                    <button onClick={handleInvoiceSave} className={`w-full py-10 rounded-[3rem] font-black text-4xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-4 ${invMode==='銷項'?'bg-indigo-600 text-white shadow-indigo-200':'bg-red-600 text-white shadow-red-200'}`}>存檔 {invMode}發票紀錄</button>
+                                </div>
+                                <div className="bg-white rounded-[4rem] border shadow-xl overflow-hidden">
+                                    <h4 className="p-10 font-black text-slate-400 uppercase tracking-widest border-b bg-slate-50 text-xs">歷史紀錄 ({invMode})</h4>
+                                    <table className="w-full text-left">
+                                        <thead className="bg-slate-50 border-b font-black text-slate-400 uppercase tracking-widest text-[10px]"><th className="p-10 w-1/4">日期 / 統編</th><th className="p-10 w-1/2">對象資訊 / 號碼</th><th className="p-10 text-right w-1/4">帳項總額</th></thead>
+                                        <tbody>{(invMode==='銷項'?data.invoices:data.inputInvoices).map(i => (<tr key={i.id} className="border-b hover:bg-slate-50 transition-colors"><td className="p-10 font-mono text-sm text-slate-400">{i.date}<div className="font-bold text-indigo-600 mt-2 text-base uppercase">{i.taxId || i.category}</div></td><td className="p-10 font-black text-slate-800 text-2xl truncate">{i.client}<div className="text-xs text-slate-400 font-mono mt-1 tracking-widest uppercase">{i.invNum || '無紀錄'}</div></td><td className="p-10 text-right font-black text-slate-800 text-3xl font-mono">${i.totalAmount?.toLocaleString()}</td></tr>))}</tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
                     </main>
 
-                    {/* 編輯產品彈窗 (雲端聯動) */}
+                    {/* 商品編輯彈窗 */}
                     {pEdit && (
                         <div className="fixed inset-0 bg-slate-900/60 z-[90] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
                             <div className="bg-white p-12 rounded-[4rem] w-full max-w-lg shadow-2xl animate-slide-in">
-                                <h3 className="text-3xl font-black mb-10 text-indigo-600 italic uppercase">編輯雲端商品參數</h3>
-                                <div className="space-y-6 mb-10">
-                                    <div className="grid grid-cols-2 gap-4"><div className="space-y-1"><label className="text-[10px] font-black opacity-30 uppercase">系統 SKU</label><input type="text" value={pForm.id} onChange={e=>setPForm({...pForm, id:e.target.value})} className="w-full px-6 py-4 rounded-2xl border-2 font-mono uppercase" /></div><div className="space-y-1"><label className="text-[10px] font-black opacity-30 uppercase">廠牌</label><input type="text" value={pForm.supplier} onChange={e=>setPForm({...pForm, supplier:e.target.value})} className="w-full px-8 py-4 rounded-2xl border-2 font-black" /></div></div>
-                                    <div className="space-y-1"><label className="text-[10px] font-black opacity-30 uppercase">產品品名</label><input type="text" value={pForm.name} onChange={e=>setPForm({...pForm, name:e.target.value})} className="w-full px-6 py-4 rounded-2xl border-2 font-black text-xl" /></div>
-                                    <div className="space-y-1"><label className="text-[10px] font-black opacity-30 uppercase">詳細規格</label><textarea rows="3" value={pForm.specs} onChange={e=>setPForm({...pForm, specs:e.target.value})} className="w-full px-6 py-4 rounded-2xl border-2 font-medium" /></div>
-                                    <div className="space-y-1"><label className="text-[10px] font-black opacity-30 uppercase">單價 (TWD)</label><input type="number" value={pForm.unitPrice} onChange={e=>setPForm({...pForm, unitPrice:Number(e.target.value)})} className="w-full px-6 py-4 rounded-2xl border-2 text-right font-black text-4xl text-emerald-600" /></div>
+                                <h3 className="text-3xl font-black mb-10 text-indigo-600 italic uppercase">編輯商品參數</h3>
+                                <div className="space-y-6 mb-10 text-left">
+                                    <div className="grid grid-cols-2 gap-4"><div className="space-y-1"><label className="text-[10px] font-black opacity-30 uppercase">系統 SKU</label><input type="text" value={pForm.id} onChange={e=>setPForm({...pForm, id:e.target.value})} className="input-standard py-3 font-mono" /></div><div className="space-y-1"><label className="text-[10px] font-black opacity-30 uppercase">供應廠牌</label><input type="text" value={pForm.supplier} onChange={e=>setPForm({...pForm, supplier:e.target.value})} className="input-standard py-3" /></div></div>
+                                    <div className="space-y-1"><label className="text-[10px] font-black opacity-30 uppercase">產品品名</label><input type="text" value={pForm.name} onChange={e=>setPForm({...pForm, name:e.target.value})} className="input-standard py-3 text-xl" /></div>
+                                    <div className="space-y-1"><label className="text-[10px] font-black opacity-30 uppercase">詳細規格</label><textarea rows="3" value={pForm.specs} onChange={e=>setPForm({...pForm, specs:e.target.value})} className="input-standard py-3 font-medium custom-scrollbar" /></div>
+                                    <div className="space-y-1"><label className="text-[10px] font-black opacity-30 uppercase">建議單價</label><input type="number" value={pForm.unitPrice} onChange={e=>setPForm({...pForm, unitPrice:Number(e.target.value)})} className="input-standard py-3 text-right font-black text-4xl text-emerald-600" /></div>
                                 </div>
-                                <div className="flex gap-4"><button onClick={handleProductSubmit} className="flex-1 bg-indigo-600 text-white py-6 rounded-3xl font-black text-xl shadow-xl hover:bg-indigo-700">確認同步至雲端</button><button onClick={()=>setPEdit(null)} className="px-10 py-6 bg-slate-100 text-slate-400 rounded-3xl font-black">取消</button></div>
+                                <div className="flex gap-4"><button onClick={handleProductSave} className="flex-1 bg-indigo-600 text-white py-6 rounded-3xl font-black text-xl shadow-xl hover:bg-indigo-700">確認儲存</button><button onClick={()=>setPEdit(null)} className="px-10 py-6 bg-slate-100 text-slate-400 rounded-3xl font-black">取消</button></div>
                             </div>
                         </div>
                     )}
